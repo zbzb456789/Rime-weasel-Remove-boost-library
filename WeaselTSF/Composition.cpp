@@ -248,6 +248,16 @@ STDAPI CGetTextExtentEditSession::DoEditSession(TfEditCookie ec) {
 
 /* Composition Window Handling */
 BOOL WeaselTSF::_UpdateCompositionWindow(com_ptr<ITfContext> pContext) {
+  constexpr ULONGLONG kPositionUpdateIntervalMs = 15;
+  const ULONGLONG now = ::GetTickCount64();
+  if (!_position_update_pending &&
+      now - _last_position_update_tick < kPositionUpdateIntervalMs) {
+    _position_update_pending = true;
+    return TRUE;
+  }
+  _position_update_pending = false;
+  _last_position_update_tick = now;
+
   com_ptr<ITfContextView> pContextView;
   if (pContext->GetActiveView(&pContextView) != S_OK)
     return FALSE;

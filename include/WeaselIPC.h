@@ -6,8 +6,11 @@
 #include <memory>
 #include <KeyEvent.h>
 
-#define WEASEL_IPC_WINDOW L"WeaselIPCWindow_1.0"
-#define WEASEL_IPC_PIPE_NAME L"WeaselNamedPipe"
+#define WEASEL_IPC_WINDOW L"RimeUIIPCWindow_1.0"
+#define WEASEL_IPC_PIPE_NAME L"RimeUINamedPipe"
+
+// ProcessKeyEvent 的返回值：2 表示会话已失效，需要重建 session。
+#define WEASEL_IPC_SESSION_INVALID 2
 
 #define WEASEL_IPC_METADATA_SIZE 1024
 #define WEASEL_IPC_BUFFER_SIZE (4 * 1024)
@@ -121,7 +124,8 @@ class Client {
   // 测试连接
   bool Echo();
   // 请求服务处理按键消息
-  bool ProcessKeyEvent(KeyEvent const& keyEvent);
+  bool ProcessKeyEvent(KeyEvent const& keyEvent,
+                       bool* session_invalid = nullptr);
   // 上屏正在編輯的文字
   bool CommitComposition();
   // 清除正在編輯的文字

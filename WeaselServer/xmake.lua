@@ -17,11 +17,10 @@ target("WeaselServer")
   end)
   after_build(function(target)
     if is_arch("x86") then
-      os.cp(path.join(target:targetdir(), "WeaselServer.exe"), "$(projectdir)/output/Win32")
-      os.cp(path.join(target:targetdir(), "WeaselServer.pdb"), "$(projectdir)/output/Win32")
+      os.cp(path.join(target:targetdir(), "RimeUIServer.exe"), "$(projectdir)/output/Win32")
+      os.cp(path.join(target:targetdir(), "RimeUIServer.pdb"), "$(projectdir)/output/Win32")
     else
-      os.cp(path.join(target:targetdir(), "WeaselServer.exe"), "$(projectdir)/output")
-      os.cp(path.join(target:targetdir(), "WeaselServer.pdb"), "$(projectdir)/output")
+      os.cp(path.join(target:targetdir(), "RimeUIServer.exe"), "$(projectdir)/output")
+      os.cp(path.join(target:targetdir(), "RimeUIServer.pdb"), "$(projectdir)/output")
     end
   end)
-

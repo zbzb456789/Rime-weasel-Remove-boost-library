@@ -4,9 +4,13 @@
 #include "stdafx.h"
 #include <algorithm>
 #include <strsafe.h>
+#include <dwrite.h>
+#include <wrl/client.h>
 #include <ResponseParser.h>
 #include <StringAlgorithm.hpp>
 #include "WeaselIME.h"
+
+#pragma comment(lib, "dwrite.lib")
 
 // logging disabled
 #define EZDBGONLYLOGGERVAR(...)
@@ -490,11 +494,36 @@ void WeaselIME::_UpdateInputPosition(LPINPUTCONTEXT lpIMC, POINT pt) {
 
   int height = abs(lpIMC->lfFont.W.lfHeight);
   if (height == 0) {
-    HDC hDC = GetDC(lpIMC->hWnd);
-    SIZE sz = {0};
-    GetTextExtentPoint(hDC, L"A", 1, &sz);
-    height = sz.cy;
-    ReleaseDC(lpIMC->hWnd, hDC);
+    Microsoft::WRL::ComPtr<IDWriteFactory> dwriteFactory;
+    HRESULT hr = ::DWriteCreateFactory(
+        DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory),
+        reinterpret_cast<IUnknown**>(dwriteFactory.GetAddressOf()));
+    if (SUCCEEDED(hr)) {
+      LOGFONTW lf = lpIMC->lfFont.W;
+      if (lf.lfFaceName[0] == L'\0')
+        wcscpy_s(lf.lfFaceName, L"Segoe UI");
+
+      const DWRITE_FONT_WEIGHT fontWeight =
+          lf.lfWeight == 0 ? DWRITE_FONT_WEIGHT_NORMAL
+                           : static_cast<DWRITE_FONT_WEIGHT>(lf.lfWeight);
+      const DWRITE_FONT_STYLE fontStyle =
+          lf.lfItalic ? DWRITE_FONT_STYLE_ITALIC : DWRITE_FONT_STYLE_NORMAL;
+
+      Microsoft::WRL::ComPtr<IDWriteTextFormat> textFormat;
+      hr = dwriteFactory->CreateTextFormat(
+          lf.lfFaceName, nullptr, fontWeight, fontStyle,
+          DWRITE_FONT_STRETCH_NORMAL, 12.0f, L"", &textFormat);
+      if (SUCCEEDED(hr)) {
+        Microsoft::WRL::ComPtr<IDWriteTextLayout> textLayout;
+        hr = dwriteFactory->CreateTextLayout(
+            L"A", 1, textFormat.Get(), 0.0f, 0.0f, &textLayout);
+        if (SUCCEEDED(hr)) {
+          DWRITE_TEXT_METRICS metrics = {};
+          textLayout->GetMetrics(&metrics);
+          height = static_cast<int>(metrics.height + 0.5f);
+        }
+      }
+    }
   }
 
   // 【修改点 3】：强制给定一个最小高度，防止因为高度为 0 导致后续渲染出错被拦截

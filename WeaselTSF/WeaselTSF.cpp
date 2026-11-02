@@ -16,6 +16,7 @@ static void error_message(const WCHAR* msg) {
 
 WeaselTSF::WeaselTSF() {
   _cRef = 1;
+  _context = std::make_shared<weasel::Context>();
 
   _dwThreadMgrEventSinkCookie = TF_INVALID_COOKIE;
 
@@ -93,6 +94,9 @@ STDAPI WeaselTSF::Activate(ITfThreadMgr* pThreadMgr, TfClientId tfClientId) {
 STDAPI WeaselTSF::Deactivate() {
   m_client.EndSession();
 
+  if (_context)
+    *_context = weasel::Context();
+
   _InitTextEditSink(com_ptr<ITfDocumentMgr>());
 
   _UninitThreadMgrEventSink();
@@ -166,7 +170,7 @@ ExitError:
 
 STDMETHODIMP WeaselTSF::OnSetThreadFocus() {
   std::wstring _ToggleImeOnOpenClose{};
-  RegGetStringValue(HKEY_CURRENT_USER, L"Software\\Rime\\weasel",
+  RegGetStringValue(HKEY_CURRENT_USER, L"Software\\RimeUI",
                     L"ToggleImeOnOpenClose", _ToggleImeOnOpenClose);
   _isToOpenClose = (_ToggleImeOnOpenClose == L"yes");
   if (m_client.Echo()) {
@@ -179,6 +183,9 @@ STDMETHODIMP WeaselTSF::OnSetThreadFocus() {
   return S_OK;
 }
 STDMETHODIMP WeaselTSF::OnKillThreadFocus() {
+  _server_connected = false;
+  if (_context)
+    *_context = weasel::Context();
   _AbortComposition();
   return S_OK;
 }
@@ -220,6 +227,8 @@ STDMETHODIMP WeaselTSF::OnActivated(REFCLSID clsid,
 void WeaselTSF::_Reconnect() {
   m_client.Disconnect();
   m_client.Connect(NULL);
+  if (_context)
+    *_context = weasel::Context();
   m_client.StartSession();
   weasel::ResponseParser parser(NULL, NULL, &_status, NULL, &_cand->style());
   bool ok = m_client.GetResponseData(std::ref(parser));
@@ -228,14 +237,12 @@ void WeaselTSF::_Reconnect() {
   }
 }
 
-static unsigned int retry = 0;
-
 bool WeaselTSF::_EnsureServerConnected() {
   if (!m_client.Echo()) {
     _Reconnect();
-    retry++;
-    if (retry >= 6) {
-      HANDLE hMutex = CreateMutex(NULL, TRUE, L"WeaselDeployerExclusiveMutex");
+    _retry++;
+    if (_retry >= 6) {
+      HANDLE hMutex = CreateMutex(NULL, TRUE, L"RimeUIDeployerExclusiveMutex");
       if (!m_client.Echo() && GetLastError() != ERROR_ALREADY_EXISTS) {
         std::wstring dir = _GetRootDir();
         std::thread th([dir, this]() {
@@ -250,10 +257,12 @@ bool WeaselTSF::_EnsureServerConnected() {
       if (hMutex) {
         CloseHandle(hMutex);
       }
-      retry = 0;
+      _retry = 0;
     }
-    return (m_client.Echo() != 0);
+    _server_connected = (m_client.Echo() != 0);
+    return _server_connected;
   } else {
+    _server_connected = true;
     return true;
   }
 }

@@ -24,12 +24,30 @@ typedef std::map<std::string, AppOptions, CaseInsensitiveCompare>
 
 struct SessionStatus {
   SessionStatus()
-    : style(weasel::UIStyle()), status(), __synced(false), session_id(0) {
+    : style(weasel::UIStyle()),
+      status(),
+      __synced(false),
+      __ctx_synced(false),
+      __cand_synced(false),
+      __cand_sig(0),
+      __cand_highlighted(-1),
+      __cand_page(-1),
+      __cand_total_pages(-1),
+      __cand_is_last_page(false),
+      session_id(0) {
     RIME_STRUCT_INIT(RimeStatus, status);
   }
   weasel::UIStyle style;
   RimeStatus status;
   bool __synced;
+  // ctx 增量发送状态：客户端是否已持有上一次的 Context 内容
+  bool __ctx_synced;
+  bool __cand_synced;
+  size_t __cand_sig;
+  int __cand_highlighted;
+  int __cand_page;
+  int __cand_total_pages;
+  bool __cand_is_last_page;
   RimeSessionId session_id;
 };
 typedef std::map<DWORD, SessionStatus> SessionStatusMap;

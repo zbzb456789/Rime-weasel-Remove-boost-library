@@ -1,4 +1,4 @@
-﻿; weasel installation script
+﻿; RimeUI installation script
 !include FileFunc.nsh
 !include LogicLib.nsh
 !include MUI2.nsh
@@ -18,24 +18,24 @@ Unicode true
 !define WEASEL_BUILD 0
 !endif
 
-!define WEASEL_ROOT $INSTDIR\weasel-${WEASEL_VERSION}
-!define REG_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\Weasel"
+!define WEASEL_ROOT $INSTDIR\rimeui-${WEASEL_VERSION}
+!define REG_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\RimeUI"
 
 ; The name of the installer
-Name "小狼毫 ${WEASEL_VERSION}"
+Name "RimeUI ${WEASEL_VERSION}"
 
 ; The file to write
-OutFile "archives\weasel-${WEASEL_VERSION}-installer.exe"
+OutFile "archives\rimeui-${WEASEL_VERSION}-installer.exe"
 
 VIProductVersion "${WEASEL_VERSION}.${WEASEL_BUILD}"
-VIAddVersionKey /LANG=2052 "ProductName" "小狼毫"
+VIAddVersionKey /LANG=2052 "ProductName" "RimeUI"
 VIAddVersionKey /LANG=2052 "Comments" "Powered by RIME | 中州韻輸入法引擎"
 VIAddVersionKey /LANG=2052 "CompanyName" "式恕堂"
 VIAddVersionKey /LANG=2052 "LegalCopyright" "Copyleft RIME Developers"
-VIAddVersionKey /LANG=2052 "FileDescription" "小狼毫輸入法"
+VIAddVersionKey /LANG=2052 "FileDescription" "RimeUI輸入法"
 VIAddVersionKey /LANG=2052 "FileVersion" "${WEASEL_VERSION}"
 
-!define MUI_ICON ..\resource\weasel.ico
+!define MUI_ICON ..\resource\rimeui.ico
 SetCompressor /SOLID lzma
 
 
@@ -49,7 +49,7 @@ RequestExecutionLevel admin
 !insertmacro MUI_PAGE_LICENSE "LICENSE.txt"
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
-;!define MUI_FINISHPAGE_RUN "$INSTDIR\WeaselSettings.exe"
+;!define MUI_FINISHPAGE_RUN "$INSTDIR\RimeUISettings.exe"
 ;!define MUI_FINISHPAGE_RUN_NOTCHECKED ; 默认不勾选（如果不加这行则默认勾选）
 
 !define MUI_FINISHPAGE_REBOOTLATER_DEFAULT ; <--- 将默认单选框指向“稍后再重新启动”
@@ -64,69 +64,59 @@ RequestExecutionLevel admin
 ; Languages
 
 !insertmacro MUI_LANGUAGE "TradChinese"
-LangString DISPLAYNAME ${LANG_TRADCHINESE} "小狼毫輸入法"
-LangString LNKFORMANUAL ${LANG_TRADCHINESE} "【小狼毫】說明書"
-LangString LNKFORSETTING ${LANG_TRADCHINESE} "【小狼毫】輸入法設定"
-LangString LNKFORDICT ${LANG_TRADCHINESE} "【小狼毫】用戶詞典管理"
-LangString LNKFORSYNC ${LANG_TRADCHINESE} "【小狼毫】用戶資料同步"
-LangString LNKFORDEPLOY ${LANG_TRADCHINESE} "【小狼毫】重新部署"
-LangString LNKFORSERVER ${LANG_TRADCHINESE} "小狼毫算法服務"
-LangString LNKFORUSERFOLDER ${LANG_TRADCHINESE} "【小狼毫】用戶文件夾"
-LangString LNKFORAPPFOLDER ${LANG_TRADCHINESE} "【小狼毫】程序文件夾"
-LangString LNKFORUPDATER ${LANG_TRADCHINESE} "【小狼毫】檢查新版本"
-LangString LNKFORSETUP ${LANG_TRADCHINESE} "【小狼毫】安裝選項"
-LangString LNKFORUNINSTALL ${LANG_TRADCHINESE} "卸載小狼毫"
-LangString CONFIRMATION ${LANG_TRADCHINESE} "安裝前，請先卸載舊版本的小狼毫。$\n$\n按下「確定」移除舊版本，按下「取消」放棄本次安裝。"
+LangString DISPLAYNAME ${LANG_TRADCHINESE} "RimeUI輸入法"
+LangString LNKFORMANUAL ${LANG_TRADCHINESE} "【RimeUI】說明書"
+LangString LNKFORSETTING ${LANG_TRADCHINESE} "【RimeUI】輸入法設定"
+LangString LNKFORDICT ${LANG_TRADCHINESE} "【RimeUI】用戶詞典管理"
+LangString LNKFORSYNC ${LANG_TRADCHINESE} "【RimeUI】用戶資料同步"
+LangString LNKFORDEPLOY ${LANG_TRADCHINESE} "【RimeUI】重新部署"
+LangString LNKFORSERVER ${LANG_TRADCHINESE} "RimeUI算法服務"
+LangString LNKFORUSERFOLDER ${LANG_TRADCHINESE} "【RimeUI】用戶文件夾"
+LangString LNKFORAPPFOLDER ${LANG_TRADCHINESE} "【RimeUI】程序文件夾"
+LangString LNKFORUPDATER ${LANG_TRADCHINESE} "【RimeUI】檢查新版本"
+LangString LNKFORSETUP ${LANG_TRADCHINESE} "【RimeUI】安裝選項"
+LangString LNKFORUNINSTALL ${LANG_TRADCHINESE} "卸載RimeUI"
+LangString CONFIRMATION ${LANG_TRADCHINESE} "安裝前，請先卸載舊版本的RimeUI。$\n$\n按下「確定」移除舊版本，按下「取消」放棄本次安裝。"
 LangString SYSTEMVERSIONNOTOK ${LANG_TRADCHINESE} "您的系统不被支持，最低系統要求:Windows 8.1!"
 LangString AUTOCHKUPDATE ${LANG_TRADCHINESE} "自動檢查版本更新？"
 
 !insertmacro MUI_LANGUAGE "SimpChinese"
-LangString DISPLAYNAME ${LANG_SIMPCHINESE} "小狼毫输入法"
-LangString LNKFORMANUAL ${LANG_SIMPCHINESE} "【小狼毫】说明书"
-LangString LNKFORSETTING ${LANG_SIMPCHINESE} "【小狼毫】输入法设定"
-LangString LNKFORDICT ${LANG_SIMPCHINESE} "【小狼毫】用户词典管理"
-LangString LNKFORSYNC ${LANG_SIMPCHINESE} "【小狼毫】用户资料同步"
-LangString LNKFORDEPLOY ${LANG_SIMPCHINESE} "【小狼毫】重新部署"
-LangString LNKFORSERVER ${LANG_SIMPCHINESE} "小狼毫算法服务"
-LangString LNKFORUSERFOLDER ${LANG_SIMPCHINESE} "【小狼毫】用户文件夹"
-LangString LNKFORAPPFOLDER ${LANG_SIMPCHINESE} "【小狼毫】程序文件夹"
-LangString LNKFORUPDATER ${LANG_SIMPCHINESE} "【小狼毫】检查新版本"
-LangString LNKFORSETUP ${LANG_SIMPCHINESE} "【小狼毫】安装选项"
-LangString LNKFORUNINSTALL ${LANG_SIMPCHINESE} "卸载小狼毫"
-LangString CONFIRMATION ${LANG_SIMPCHINESE} '安装前，请先卸载旧版本的小狼毫。$\n$\n点击 "确定" 移除旧版本，或点击 "取消" 放弃本次安装。'
+LangString DISPLAYNAME ${LANG_SIMPCHINESE} "RimeUI输入法"
+LangString LNKFORMANUAL ${LANG_SIMPCHINESE} "【RimeUI】说明书"
+LangString LNKFORSETTING ${LANG_SIMPCHINESE} "【RimeUI】输入法设定"
+LangString LNKFORDICT ${LANG_SIMPCHINESE} "【RimeUI】用户词典管理"
+LangString LNKFORSYNC ${LANG_SIMPCHINESE} "【RimeUI】用户资料同步"
+LangString LNKFORDEPLOY ${LANG_SIMPCHINESE} "【RimeUI】重新部署"
+LangString LNKFORSERVER ${LANG_SIMPCHINESE} "RimeUI算法服务"
+LangString LNKFORUSERFOLDER ${LANG_SIMPCHINESE} "【RimeUI】用户文件夹"
+LangString LNKFORAPPFOLDER ${LANG_SIMPCHINESE} "【RimeUI】程序文件夹"
+LangString LNKFORUPDATER ${LANG_SIMPCHINESE} "【RimeUI】检查新版本"
+LangString LNKFORSETUP ${LANG_SIMPCHINESE} "【RimeUI】安装选项"
+LangString LNKFORUNINSTALL ${LANG_SIMPCHINESE} "卸载RimeUI"
+LangString CONFIRMATION ${LANG_SIMPCHINESE} '安装前，请先卸载旧版本的RimeUI。$\n$\n点击 "确定" 移除旧版本，或点击 "取消" 放弃本次安装。'
 LangString SYSTEMVERSIONNOTOK ${LANG_SIMPCHINESE} "您的系統不被支持，最低系统要求:Windows 8.1!"
 LangString AUTOCHKUPDATE ${LANG_SIMPCHINESE} "自动检查版本更新？"
 
 !insertmacro MUI_LANGUAGE "English"
-LangString DISPLAYNAME ${LANG_ENGLISH} "Weasel"
-LangString LNKFORMANUAL ${LANG_ENGLISH} "Weasel Manual"
-LangString LNKFORSETTING ${LANG_ENGLISH} "Weasel Settings"
-LangString LNKFORDICT ${LANG_ENGLISH} "Weasel Dictionary Manager"
-LangString LNKFORSYNC ${LANG_ENGLISH} "Weasel Sync User Profile"
-LangString LNKFORDEPLOY ${LANG_ENGLISH} "Weasel Deploy"
-LangString LNKFORSERVER ${LANG_ENGLISH} "Weasel Server"
-LangString LNKFORUSERFOLDER ${LANG_ENGLISH} "Weasel User Folder"
-LangString LNKFORAPPFOLDER ${LANG_ENGLISH} "Weasel App Folder"
-LangString LNKFORUPDATER ${LANG_ENGLISH} "Weasel Check for Updates"
-LangString LNKFORSETUP ${LANG_ENGLISH} "Weasel Installation Preference"
-LangString LNKFORUNINSTALL ${LANG_ENGLISH} "Uninstall Weasel"
-LangString CONFIRMATION ${LANG_ENGLISH} "Before installation, please uninstall the old version of Weasel.$\n$\nPress 'OK' to remove the old version, or 'Cancel' to abort installation."
+LangString DISPLAYNAME ${LANG_ENGLISH} "RimeUI"
+LangString LNKFORMANUAL ${LANG_ENGLISH} "RimeUI Manual"
+LangString LNKFORSETTING ${LANG_ENGLISH} "RimeUI Settings"
+LangString LNKFORDICT ${LANG_ENGLISH} "RimeUI Dictionary Manager"
+LangString LNKFORSYNC ${LANG_ENGLISH} "RimeUI Sync User Profile"
+LangString LNKFORDEPLOY ${LANG_ENGLISH} "RimeUI Deploy"
+LangString LNKFORSERVER ${LANG_ENGLISH} "RimeUI Server"
+LangString LNKFORUSERFOLDER ${LANG_ENGLISH} "RimeUI User Folder"
+LangString LNKFORAPPFOLDER ${LANG_ENGLISH} "RimeUI App Folder"
+LangString LNKFORUPDATER ${LANG_ENGLISH} "RimeUI Check for Updates"
+LangString LNKFORSETUP ${LANG_ENGLISH} "RimeUI Installation Preference"
+LangString LNKFORUNINSTALL ${LANG_ENGLISH} "Uninstall RimeUI"
+LangString CONFIRMATION ${LANG_ENGLISH} "Before installation, please uninstall the old version of RimeUI.$\n$\nPress 'OK' to remove the old version, or 'Cancel' to abort installation."
 LangString SYSTEMVERSIONNOTOK ${LANG_ENGLISH} "Your system not supported, minimium system required: Windows 8.1!"
 LangString AUTOCHKUPDATE ${LANG_ENGLISH} "Automatically check for updates?"
 
 ;--------------------------------
 
 Function .onInit
-
-  ; --- 新增：强制检查管理员组权限 ---
-  UserInfo::GetAccountType
-  Pop $0
-  ${If} $0 != "Admin" ; 如果不是管理员
-    MessageBox MB_OK|MB_ICONSTOP "本安装程序必须以管理员权限运行！"
-    Quit
-  ${EndIf}
-  ; ------------------------------
-
   ; if not version >= 8.1, quit and MessageBox(if not silent)
   ${IfNot} ${AtLeastWin8.1}
     IfSilent toquit
@@ -135,29 +125,29 @@ toquit:
     Quit
   ${EndIf}
 
-  ReadRegStr $R0 HKLM "Software\Rime\Weasel" "InstallDir"
+  ReadRegStr $R0 HKLM "Software\RimeUI" "InstallDir"
   StrCmp $R0 "" 0 skip
   ; The default installation directory
   ; install x64 build for NativeARM64_WINDOWS11 and NativeAMD64_WINDOWS11
   ${If} ${AtLeastWin11} ; Windows 11 and above
     ${If} ${IsNativeARM64}
-      StrCpy $INSTDIR "$PROGRAMFILES64\Rime"
+      StrCpy $INSTDIR "$PROGRAMFILES64\RimeUI"
     ${ElseIf} ${IsNativeAMD64}
-      StrCpy $INSTDIR "$PROGRAMFILES64\Rime"
+      StrCpy $INSTDIR "$PROGRAMFILES64\RimeUI"
     ${Else}
-      StrCpy $INSTDIR "$PROGRAMFILES\Rime"
+      StrCpy $INSTDIR "$PROGRAMFILES\RimeUI"
     ${Endif}
   ; install x64 build for NativeAMD64_BELLOW_WINDOWS11
   ${Else} ; Windows 10 or bellow
     ${If} ${IsNativeAMD64}
-      StrCpy $INSTDIR "$PROGRAMFILES64\Rime"
+      StrCpy $INSTDIR "$PROGRAMFILES64\RimeUI"
     ${Else}
-      StrCpy $INSTDIR "$PROGRAMFILES\Rime"
+      StrCpy $INSTDIR "$PROGRAMFILES\RimeUI"
     ${Endif}
   ${Endif}
 skip:
   ReadRegStr $R0 HKLM \
-  "Software\Microsoft\Windows\CurrentVersion\Uninstall\Weasel" \
+  "Software\Microsoft\Windows\CurrentVersion\Uninstall\RimeUI" \
   "UninstallString"
   StrCmp $R0 "" done
 
@@ -167,104 +157,105 @@ skip:
   Abort
 
 uninst:
-  ; ============================================================
-  ; 步骤 1: 确定用户文件夹路径 ($2)
-  ; ============================================================
-  StrCpy $2 ""
+  ; Backup data directory from previous installation, user files may exist
+  ReadRegStr $R1 HKLM SOFTWARE\RimeUI "RimeUIRoot"
   
-  ; 优先尝试 64 位注册表视图
+  
+  ; 使用寄存器 $R2 存储最终找到的路径，初始化为空
+  StrCpy $R2 ""
+
+  ; --- 步骤 1: 默认视图读取 (对应 RegistryView.Default) ---
+  ; 如果是64位系统，先尝试切到64位视图（保持默认行为）
   ${If} ${RunningX64}
     SetRegView 64
   ${EndIf}
-  ReadRegStr $2 HKCU "Software\Rime\Weasel" "RimeUserDir"
   
-  ; 如果没读到，尝试 32 位视图
-  ${If} $2 == ""
-  ${OrIfNot} ${FileExists} "$2\*.*"
-    SetRegView 32
-    ReadRegStr $2 HKCU "Software\Rime\Weasel" "RimeUserDir"
-    ${If} ${RunningX64}
-      SetRegView 64 ; 切回默认的 64 位视图
-    ${EndIf}
-  ${EndIf}
-
-  ; 如果注册表里都没有，使用系统默认的 AppData 路径
-  ${If} $2 == ""
-  ${OrIfNot} ${FileExists} "$2\*.*"
-    StrCpy $2 "$APPDATA\Rime"
-  ${EndIf}
-
-  ; ============================================================
-  ; 步骤 2: 停止相关进程
-  ; ============================================================
-  IfFileExists "$INSTDIR\WeaselServer.exe" 0 +2
-  ExecWait '"$INSTDIR\WeaselServer.exe" /quit'
-
-  Sleep 800
-
-  ; ============================================================
-  ; 步骤 3: 获取当前时间戳并执行备份
-  ; ============================================================
-  ; ${GetTime} 需要在文件头有 !include FileFunc.nsh
-  ; 返回值说明: $R7=年, $R8=月, $R9=日, $R5=时, $R4=分, $R3=秒
-  ${GetTime} "" "L" $R9 $R8 $R7 $R6 $R5 $R4 $R3
-  StrCpy $1 "$R7$R8$R9_$R5$R4$R3" ; 格式：20260216_195530
-
-  ${If} ${FileExists} "$2\*.*"
-    ; 定义带时间戳的桌面备份目录
-    StrCpy $3 "$DESKTOP\Rime_Backup_$1"
-    
-    DetailPrint "正在自动备份用户数据到: $3"
-    CreateDirectory "$3"
-    CopyFiles /SILENT "$2\*" "$3"  ; 执行核心词库备份
-    
-    ; ============================================================
-    ; 步骤 4: 备份成功后，删除旧的用户数据
-    ; ============================================================
-    SetShellVarContext current
-    DetailPrint "正在清理原始用户数据目录..."
-    RMDir /r "$2"
-    
-    ; 如果用户用了自定义路径，那顺便把默认路径也清理一下，保持干净
-    ${If} $2 != "$APPDATA\Rime"
-      RMDir /r "$APPDATA\Rime"
-    ${EndIf}
-  ${EndIf}
-
-  ; ============================================================
-  ; 步骤 5: 获取旧版程序根目录，准备后续卸载
-  ; ============================================================
-  ReadRegStr $R1 HKLM SOFTWARE\Rime\Weasel "WeaselRoot"
+  ReadRegStr $R2 HKCU "Software\RimeUI" "RimeUserDir"
   
-  ; 如果找不到根目录则跳到结束，否则进入卸载流程
-  ${If} $R1 == ""
-    Goto done
+  ; 检查路径是否有效 (非空且存在)
+  ${If} $R2 != ""
+  ${AndIf} ${FileExists} "$R2\*.*"
+      DetailPrint "通过注册表(默认视图)找到用户路径: $R2"
+      Goto DoBackup
+  ${EndIf}
+
+  ; --- 步骤 2: 兼容视图读取 (对应 RegistryView.Registry32) ---
+  SetRegView 32
+  ReadRegStr $R2 HKCU "Software\RimeUI" "RimeUserDir"
+  
+  ; 恢复视图设置，避免影响后续操作
+  ${If} ${RunningX64}
+    SetRegView 64
+  ${EndIf}
+
+  ; 检查路径是否有效
+  ${If} $R2 != ""
+  ${AndIf} ${FileExists} "$R2\*.*"
+      DetailPrint "通过注册表(32位视图)找到用户路径: $R2"
+      Goto DoBackup
+  ${EndIf}
+
+  ; --- 步骤 3: 默认路径 (对应 Environment.GetFolderPath) ---
+  ; 如果注册表都没找到，使用默认 AppData 路径
+  StrCpy $R2 "$APPDATA\RimeUI"
+  DetailPrint "使用默认用户路径: $R2"
+
+  ; --- 执行备份操作 ---
+  DoBackup:
+  
+  ; 再次确认目录存在才备份
+  ${If} ${FileExists} "$R2\*.*"
+      ; === 新增：获取当前时间并格式化 ===
+      ${GetTime} "" "L" $R9 $R8 $R7 $R6 $R5 $R4 $R3
+      ; $R7=年, $R8=月, $R9=日, $R5=时, $R4=分, $R3=秒
+      StrCpy $2 "$R7$R8$R9_$R5$R4$R3" 
+
+      ; 修改：将时间戳 $2 加入到备份路径中
+      StrCpy $1 "$DESKTOP\Rime_Backup_$2"
+      
+      DetailPrint "正在备份用户数据到: $1"
+      CreateDirectory "$1"
+      
+      CopyFiles /SILENT "$R2\*" "$1"
+      
+      MessageBox MB_OK "检测到旧的用户数据，已备份至桌面的 [Rime_Backup_$2] 文件夹。"
   ${Else}
-    Goto call_uninstaller
+      DetailPrint "未找到有效的用户数据目录，跳过备份。"
   ${EndIf}
+
+  ;===================================================================
+  ; [结束] 用户数据备份逻辑
+  ;===================================================================
+  
+  
+  StrCmp $R1 "" call_uninstaller
+  IfFileExists $R1\data\*.* 0 call_uninstaller
+  
+  ExecWait '"$R1\RimeUIServer.exe" /quit'
+  RMDir /r "$R2"
 
 call_uninstaller:
-  ExecWait '"$R1\WeaselServer.exe" /quit'
-  ExecWait '"$R1\WeaselSetup.exe" /u'
+  ExecWait '"$R1\RimeUIServer.exe" /quit'
+  ExecWait '"$R1\RimeUISetup.exe" /u'
   ; Remove registry keys
-  DeleteRegKey HKLM SOFTWARE\Rime
-  DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Weasel"
+  DeleteRegKey HKLM SOFTWARE\RimeUI
+  DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\RimeUI"
   ; don't redirect on 64 bit system for auto run setting
   ${If} ${IsNativeARM64}
     SetRegView 64
   ${ElseIf} ${IsNativeAMD64}
     SetRegView 64
   ${Endif}
-  DeleteRegValue HKLM "Software\Microsoft\Windows\CurrentVersion\Run" "WeaselServer"
+  DeleteRegValue HKLM "Software\Microsoft\Windows\CurrentVersion\Run" "RimeUIServer"
   ; recover back to 32bit view
   SetRegView 32
   ; Remove files and uninstaller
   Delete  "$R1\data\opencc\*.*"
-  ;Delete  "$R1\data\preview\*.*"
+  Delete  "$R1\data\preview\*.*"
   Delete  "$R1\data\*.*"
   Delete  "$R1\*.*"
   RMDir   "$R1\data\opencc"
-  ;RMDir   "$R1\data\preview"
+  RMDir   "$R1\data\preview"
   RMDir   "$R1\data"
   RMDir   "$R1"
   SetShellVarContext all
@@ -279,32 +270,32 @@ FunctionEnd
 
 ; Registry key to check for directory (so if you install again, it will
 ; overwrite the old one automatically)
-InstallDirRegKey HKLM "Software\Rime\Weasel" "InstallDir"
+InstallDirRegKey HKLM "Software\RimeUI" "InstallDir"
 
 ; The stuff to install
-Section "Weasel"
+Section "RimeUI"
 
   SectionIn RO
 
   ; Write the new installation path into the registry
   ; redirect on 64 bit system
-  ; HKLM SOFTWARE\WOW6432Node\Rime\Weasel "InstallDir" "$INSTDIR"
-  WriteRegStr HKLM SOFTWARE\Rime\Weasel "InstallDir" "$INSTDIR"
+  ; HKLM SOFTWARE\WOW6432Node\Rime\RimeUI "InstallDir" "$INSTDIR"
+  WriteRegStr HKLM SOFTWARE\RimeUI "InstallDir" "$INSTDIR"
 
   ; Reset INSTDIR for the new version
   StrCpy $INSTDIR "${WEASEL_ROOT}"
 
-  IfFileExists "$INSTDIR\WeaselServer.exe" 0 +2
-  ExecWait '"$INSTDIR\WeaselServer.exe" /quit'
+  IfFileExists "$INSTDIR\RimeUIServer.exe" 0 +2
+  ExecWait '"$INSTDIR\RimeUIServer.exe" /quit'
 
   SetOverwrite try
   ; Set output path to the installation directory.
   SetOutPath $INSTDIR
 
-  ;IfFileExists $TEMP\weasel-backup\*.* 0 program_files
+  ;IfFileExists $TEMP\rimeui-backup\*.* 0 program_files
   ;CreateDirectory $INSTDIR\data
-  ;CopyFiles $TEMP\weasel-backup\*.* $INSTDIR\data
-  ;RMDir /r $TEMP\weasel-backup
+  ;CopyFiles $TEMP\rimeui-backup\*.* $INSTDIR\data
+  ;RMDir /r $TEMP\rimeui-backup
 
 program_files:
   File "LICENSE.txt"
@@ -319,60 +310,63 @@ program_files:
   File "rime-install-config.bat"
   File "start_service.bat"
   File "stop_service.bat"
-  File "weasel.dll"
-  File "WeaselSettings.exe"
+  File "rimeui.dll"
+  File "RimeUISettings.exe"
   File "data.zip"
+  File "av_libglesv2.dll"
+  File "libHarfBuzzSharp.dll"
+  File "libSkiaSharp.dll"
   ${If} ${RunningX64}
-    File "weaselx64.dll"
+    File "rimeuix64.dll"
   ${EndIf}
   ${If} ${IsNativeARM64}
-    File /nonfatal "weaselARM.dll"
-    File /nonfatal "weaselARM64.dll"
-    File /nonfatal "weaselARM64X.dll"
+    File /nonfatal "rimeuiARM.dll"
+    File /nonfatal "rimeuiARM64.dll"
+    File /nonfatal "rimeuiARM64X.dll"
   ${EndIf}
-  File "weasel.ime"
+  File "rimeui.ime"
   ${If} ${RunningX64}
-    File "weaselx64.ime"
+    File "rimeuix64.ime"
   ${EndIf}
   ${If} ${IsNativeARM64}
-    File /nonfatal "weaselARM.ime"
-    File /nonfatal "weaselARM64.ime"
-    File /nonfatal "weaselARM64X.ime"
+    File /nonfatal "rimeuiARM.ime"
+    File /nonfatal "rimeuiARM64.ime"
+    File /nonfatal "rimeuiARM64X.ime"
   ${EndIf}
   ; install x64 build for NativeARM64_WINDOWS11 and NativeAMD64_WINDOWS11
   ${If} ${AtLeastWin11} ; Windows 11 and above
     ${If} ${IsNativeARM64}
-      File "WeaselDeployer.exe"
-      File "WeaselServer.exe"
+      File "RimeUIDeployer.exe"
+      File "RimeUIServer.exe"
       File "rime.dll"
       File "WinSparkle.dll"
     ${ElseIf} ${IsNativeAMD64}
-      File "WeaselDeployer.exe"
-      File "WeaselServer.exe"
+      File "RimeUIDeployer.exe"
+      File "RimeUIServer.exe"
       File "rime.dll"
       File "WinSparkle.dll"
     ${Else}
-      File "Win32\WeaselDeployer.exe"
-      File "Win32\WeaselServer.exe"
+      File "Win32\RimeUIDeployer.exe"
+      File "Win32\RimeUIServer.exe"
       File "Win32\rime.dll"
       File "Win32\WinSparkle.dll"
     ${Endif}
   ; install x64 build for NativeAMD64_BELLOW_WINDOWS11
   ${Else} ; Windows 10 or bellow
     ${If} ${IsNativeAMD64}
-      File "WeaselDeployer.exe"
-      File "WeaselServer.exe"
+      File "RimeUIDeployer.exe"
+      File "RimeUIServer.exe"
       File "rime.dll"
       File "WinSparkle.dll"
     ${Else}
-      File "Win32\WeaselDeployer.exe"
-      File "Win32\WeaselServer.exe"
+      File "Win32\RimeUIDeployer.exe"
+      File "Win32\RimeUIServer.exe"
       File "Win32\rime.dll"
       File "Win32\WinSparkle.dll"
     ${Endif}
   ${Endif}
 
-  File "WeaselSetup.exe"
+  File "RimeUISetup.exe"
   ; shared data files
   SetOutPath $INSTDIR\data
   File "data\*.yaml"
@@ -399,11 +393,11 @@ program_files:
   IfErrors +2 0
   StrCpy $R2 "/t"
 
-  ExecWait '"$INSTDIR\WeaselSetup.exe" $R2'
+  ExecWait '"$INSTDIR\RimeUISetup.exe" $R2'
 
   ; Write the uninstall keys for Windows
   WriteRegStr HKLM "${REG_UNINST_KEY}" "DisplayName" "$(DISPLAYNAME)"
-  WriteRegStr HKLM "${REG_UNINST_KEY}" "DisplayIcon" '"$INSTDIR\WeaselServer.exe"'
+  WriteRegStr HKLM "${REG_UNINST_KEY}" "DisplayIcon" '"$INSTDIR\RimeUIServer.exe"'
   WriteRegStr HKLM "${REG_UNINST_KEY}" "DisplayVersion" "${WEASEL_VERSION}.${WEASEL_BUILD}"
   WriteRegStr HKLM "${REG_UNINST_KEY}" "UninstallString" '"$INSTDIR\uninstall.exe"'
   WriteRegStr HKLM "${REG_UNINST_KEY}" "Publisher" "式恕堂"
@@ -415,12 +409,12 @@ program_files:
 
   ; run as user...
   IfSilent deploy_silently
-  ;ExecWait "$INSTDIR\WeaselSetup.exe"
-  ;ExecWait "$INSTDIR\WeaselDeployer.exe /install"
+  ;ExecWait "$INSTDIR\RimeUISetup.exe"
+  ;ExecWait "$INSTDIR\RimeUIDeployer.exe /install"
   GoTo deploy_done
 
   deploy_silently:
-  ;ExecWait "$INSTDIR\WeaselSetup.exe"
+  ;ExecWait "$INSTDIR\RimeUISetup.exe"
   deploy_done:
 
   ; don't redirect on 64 bit system for auto run setting
@@ -430,18 +424,18 @@ program_files:
     SetRegView 64
   ${Endif}
   ; Write autorun key
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Run" "WeaselServer" "$INSTDIR\WeaselServer.exe"
-  ; Start WeaselServer
-  Exec "$INSTDIR\WeaselServer.exe"
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Run" "RimeUIServer" "$INSTDIR\RimeUIServer.exe"
+  ; Start RimeUIServer
+  Exec "$INSTDIR\RimeUIServer.exe"
 
   ; option CheckForUpdates
   ;IfSilent DisableAutoCheckUpdate
   ;MessageBox MB_YESNO|MB_ICONINFORMATION "$(AUTOCHKUPDATE)" IDYES EnableAutoCheckUpdate
   ;DisableAutoCheckUpdate:
-  WriteRegStr HKCU "Software\Rime\Weasel\Updates" "CheckForUpdates" "0"
+  WriteRegStr HKCU "Software\RimeUI\Updates" "CheckForUpdates" "0"
   ;GoTo end
   ;EnableAutoCheckUpdate:
-  ;WriteRegStr HKCU "Software\Rime\Weasel\Updates" "CheckForUpdates" "1"
+  ;WriteRegStr HKCU "Software\RimeUI\Updates" "CheckForUpdates" "1"
   ;end:
 
   ; Prompt reboot
@@ -457,11 +451,11 @@ Section "Uninstall"
   ;--------------------------------
   ; 停止服务
   ;--------------------------------
-  IfFileExists "$INSTDIR\WeaselServer.exe" 0 +2
-  ExecWait '"$INSTDIR\WeaselServer.exe" /quit'
+  IfFileExists "$INSTDIR\RimeUIServer.exe" 0 +2
+  ExecWait '"$INSTDIR\RimeUIServer.exe" /quit'
 
-  IfFileExists "$INSTDIR\WeaselSetup.exe" 0 +2
-  ExecWait '"$INSTDIR\WeaselSetup.exe" /u'
+  IfFileExists "$INSTDIR\RimeUISetup.exe" 0 +2
+  ExecWait '"$INSTDIR\RimeUISetup.exe" /u'
 
   Sleep 800
 
@@ -479,7 +473,7 @@ Section "Uninstall"
     SetRegView 64
   ${EndIf}
   
-  ReadRegStr $0 HKCU "Software\Rime\Weasel" "RimeUserDir"
+  ReadRegStr $0 HKCU "Software\RimeUI" "RimeUserDir"
   
   ; 检查路径是否有效 (非空且存在)
   ${If} $0 != ""
@@ -490,7 +484,7 @@ Section "Uninstall"
 
   ; --- 步骤 2: 兼容视图读取 (对应 RegistryView.Registry32) ---
   SetRegView 32
-  ReadRegStr $0 HKCU "Software\Rime\Weasel" "RimeUserDir"
+  ReadRegStr $0 HKCU "Software\RimeUI" "RimeUserDir"
   
   ; 恢复视图设置，避免影响后续操作
   ${If} ${RunningX64}
@@ -506,7 +500,7 @@ Section "Uninstall"
 
   ; --- 步骤 3: 默认路径 (对应 Environment.GetFolderPath) ---
   ; 如果注册表都没找到，使用默认 AppData 路径
-  StrCpy $0 "$APPDATA\Rime"
+  StrCpy $0 "$APPDATA\RimeUI"
   DetailPrint "使用默认用户路径: $0"
 
   ; --- 执行备份操作 ---
@@ -545,19 +539,19 @@ Section "Uninstall"
     SetRegView 64
   ${EndIf}
 
-  DeleteRegValue HKLM "Software\Microsoft\Windows\CurrentVersion\Run" "WeaselServer"
-  DeleteRegKey HKLM "Software\Rime\Weasel"
-  DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Weasel"
+  DeleteRegValue HKLM "Software\Microsoft\Windows\CurrentVersion\Run" "RimeUIServer"
+  DeleteRegKey HKLM "Software\RimeUI"
+  DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\RimeUI"
 
   ; 切回32位视图
   SetRegView 32
 
-  DeleteRegValue HKLM "Software\Microsoft\Windows\CurrentVersion\Run" "WeaselServer"
-  DeleteRegKey HKLM "Software\Rime\Weasel"
-  DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Weasel"
+  DeleteRegValue HKLM "Software\Microsoft\Windows\CurrentVersion\Run" "RimeUIServer"
+  DeleteRegKey HKLM "Software\RimeUI"
+  DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\RimeUI"
 
   ; 删除当前用户配置
-  DeleteRegKey HKCU "Software\Rime\Weasel"
+  DeleteRegKey HKCU "Software\RimeUI"
 
   ;--------------------------------
   ; 删除文件
@@ -584,11 +578,11 @@ Section "Uninstall"
   SetShellVarContext current
   
   ; 删除默认 AppData 路径
-  IfFileExists "$APPDATA\Rime" 0 +2
-  RMDir /r "$APPDATA\Rime"
+  IfFileExists "$APPDATA\RimeUI" 0 +2
+  RMDir /r "$APPDATA\RimeUI"
 
   ; [可选] 如果你想把注册表里读取到的那个自定义路径的源文件也删掉（因为已经备份了）
-  ${If} $0 != "$APPDATA\Rime"
+  ${If} $0 != "$APPDATA\RimeUI"
   ${AndIf} $0 != ""
     RMDir /r "$0"
   ${EndIf}
@@ -602,5 +596,5 @@ SectionEnd
 
 
 Function .onGUIEnd
-    Exec '"$INSTDIR\WeaselSettings.exe"'
+    Exec '"$INSTDIR\RimeUISettings.exe"'
 FunctionEnd

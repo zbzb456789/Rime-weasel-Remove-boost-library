@@ -1,7 +1,12 @@
 #include "stdafx.h"
+#include <initguid.h>
+#include <d2d1_1.h>
+#include <d2d1effects.h>
 #include <string>
 #include <algorithm>
 #include <map>
+#include <cmath>
+#include <vector>
 #include <WeaselUI.h>
 
 using namespace weasel;
@@ -27,7 +32,8 @@ DirectWriteResources::DirectWriteResources(weasel::UIStyle& style,
       pPreeditTextFormat(NULL),
       pTextFormat(NULL),
       pLabelTextFormat(NULL),
-      pCommentTextFormat(NULL) {
+      pCommentTextFormat(NULL),
+      textAntialiasMode_(D2D1_TEXT_ANTIALIAS_MODE_CLEARTYPE) {
   D2D1_TEXT_ANTIALIAS_MODE mode =
       _style.antialias_mode <= 3
           ? (D2D1_TEXT_ANTIALIAS_MODE)(_style.antialias_mode)
@@ -39,16 +45,7 @@ DirectWriteResources::DirectWriteResources(weasel::UIStyle& style,
   HR(DWriteCreateFactory(
       DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory),
       reinterpret_cast<IUnknown**>(pDWFactory.ReleaseAndGetAddressOf())));
-  /* ID2D1HwndRenderTarget */
-  const D2D1_PIXEL_FORMAT format = D2D1::PixelFormat(
-      DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED);
-  const D2D1_RENDER_TARGET_PROPERTIES properties =
-      D2D1::RenderTargetProperties(D2D1_RENDER_TARGET_TYPE_DEFAULT, format);
-  HR(pD2d1Factory->CreateDCRenderTarget(&properties, &pRenderTarget));
-  pRenderTarget->SetTextAntialiasMode(mode);
-  pRenderTarget->SetAntialiasMode(D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
-  HR(pRenderTarget->CreateSolidColorBrush(D2D1::ColorF(1.0f, 1.0f, 1.0f, 1.0f),
-                                          pBrush.ReleaseAndGetAddressOf()));
+  textAntialiasMode_ = mode;
   // get the dpi information
   dpiScaleFontPoint = dpiScaleLayout = (float)dpi;
   dpiScaleFontPoint /= 72.0f;
@@ -58,6 +55,502 @@ DirectWriteResources::DirectWriteResources(weasel::UIStyle& style,
 }
 
 DirectWriteResources::~DirectWriteResources() {}
+
+HRESULT DirectWriteResources::SetRenderTarget(ID2D1RenderTarget* renderTarget) {
+  if (!renderTarget)
+    return E_POINTER;
+
+  // D2D 资源和 device 绑定；同一 device 的跨帧绘制可以复用 brush/阴影资源。
+  ComPtr<ID2D1Device> device;
+  ComPtr<ID2D1DeviceContext> deviceContext;
+  if (SUCCEEDED(renderTarget->QueryInterface(
+          __uuidof(ID2D1DeviceContext),
+          reinterpret_cast<void**>(deviceContext.GetAddressOf())))) {
+    deviceContext->GetDevice(device.GetAddressOf());
+  }
+  if (!device || pCachedDevice.Get() != device.Get()) {
+    pBrush.Reset();
+    pShadowBlurEffect.Reset();
+    pShadowBitmap.Reset();
+    shadowBitmapWidth = 0;
+    shadowBitmapHeight = 0;
+    pCachedDevice = device;
+  }
+  pRenderTarget = renderTarget;
+  pRenderTarget->SetTextAntialiasMode(textAntialiasMode_);
+  pRenderTarget->SetAntialiasMode(D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+  if (pBrush)
+    return S_OK;
+  return pRenderTarget->CreateSolidColorBrush(
+      D2D1::ColorF(1.0f, 1.0f, 1.0f, 1.0f),
+      pBrush.ReleaseAndGetAddressOf());
+}
+
+void DirectWriteResources::ClearRenderTarget() {
+  // 保留缓存的 brush/阴影资源，只释放当前帧的 render target 引用。
+  pRenderTarget.Reset();
+}
+
+HRESULT DirectWriteResources::CreateTextLayoutCached(
+    std::wstring_view text,
+    const int& nCount,
+    IDWriteTextFormat1* const txtFormat,
+    const float& width,
+    const float& height,
+    bool verticalText,
+    bool leftToRight) {
+  if (!txtFormat)
+    return E_POINTER;
+
+  const TextLayoutKey key{std::wstring(text.substr(0, nCount)), txtFormat,
+                          width, height, verticalText, leftToRight};
+  auto it = textLayoutCache_.find(key);
+  if (it != textLayoutCache_.end()) {
+    pTextLayout = it->second;
+    return S_OK;
+  }
+
+  HRESULT hr = pDWFactory->CreateTextLayout(
+      text.data(), nCount, txtFormat, width, height,
+      reinterpret_cast<IDWriteTextLayout**>(
+          pTextLayout.ReleaseAndGetAddressOf()));
+  if (FAILED(hr))
+    return hr;
+
+  if (verticalText) {
+    const DWRITE_FLOW_DIRECTION flow =
+        leftToRight ? DWRITE_FLOW_DIRECTION_LEFT_TO_RIGHT
+                    : DWRITE_FLOW_DIRECTION_RIGHT_TO_LEFT;
+    pTextLayout->SetReadingDirection(DWRITE_READING_DIRECTION_TOP_TO_BOTTOM);
+    pTextLayout->SetFlowDirection(flow);
+  }
+
+  if (textLayoutCache_.size() >= 1024) {
+    // 只淘汰最旧的一批，避免多候选时整表清空导致缓存反复失效。
+    for (size_t i = 0; i < 256 && !textLayoutCache_.empty(); ++i)
+      textLayoutCache_.erase(textLayoutCache_.begin());
+  }
+  textLayoutCache_.emplace(key, pTextLayout);
+  return S_OK;
+}
+
+bool DirectWriteResources::GetCachedTextExtent(
+    std::wstring_view text,
+    IDWriteTextFormat1* const txtFormat,
+    float width,
+    float height,
+    bool verticalText,
+    bool leftToRight,
+    SIZE* size) const {
+  if (!size || !txtFormat)
+    return false;
+  const TextExtentKey key{std::wstring(text), txtFormat, width, height,
+                          verticalText, leftToRight};
+  auto it = textExtentCache_.find(key);
+  if (it == textExtentCache_.end())
+    return false;
+  *size = it->second;
+  return true;
+}
+
+void DirectWriteResources::CacheTextExtent(
+    std::wstring_view text,
+    IDWriteTextFormat1* const txtFormat,
+    float width,
+    float height,
+    bool verticalText,
+    bool leftToRight,
+    const SIZE& size) {
+  if (!txtFormat)
+    return;
+  if (textExtentCache_.size() >= 4096) {
+    for (size_t i = 0; i < 1024 && !textExtentCache_.empty(); ++i)
+      textExtentCache_.erase(textExtentCache_.begin());
+  }
+  const TextExtentKey key{std::wstring(text), txtFormat, width, height,
+                          verticalText, leftToRight};
+  textExtentCache_.insert_or_assign(key, size);
+}
+
+ComPtr<ID2D1PathGeometry> DirectWriteResources::CreateRoundRectGeometry(
+    const D2D1_RECT_F& rect,
+    float radiusX,
+    float radiusY,
+    bool roundTopLeft,
+    bool roundTopRight,
+    bool roundBottomRight,
+    bool roundBottomLeft) {
+  ComPtr<ID2D1PathGeometry> path;
+  HR(pD2d1Factory->CreatePathGeometry(path.ReleaseAndGetAddressOf()));
+  ComPtr<ID2D1GeometrySink> sink;
+  HR(path->Open(sink.ReleaseAndGetAddressOf()));
+  _AppendRoundRectPath(sink.Get(), rect, radiusX, radiusY, roundTopLeft,
+                       roundTopRight, roundBottomRight, roundBottomLeft);
+  HR(sink->Close());
+  return path;
+}
+
+ComPtr<ID2D1PathGeometry> DirectWriteResources::CreateRoundRectGeometryBatch(
+    const std::vector<ShadowShape>& shapes) {
+  if (shapes.empty())
+    return nullptr;
+
+  ComPtr<ID2D1PathGeometry> path;
+  HR(pD2d1Factory->CreatePathGeometry(path.ReleaseAndGetAddressOf()));
+  ComPtr<ID2D1GeometrySink> sink;
+  HR(path->Open(sink.ReleaseAndGetAddressOf()));
+  for (const ShadowShape& shape : shapes) {
+    _AppendRoundRectPath(sink.Get(), shape.rect, shape.radius, shape.radius,
+                         shape.roundTopLeft, shape.roundTopRight,
+                         shape.roundBottomRight, shape.roundBottomLeft);
+  }
+  HR(sink->Close());
+  return path;
+}
+
+void DirectWriteResources::_AppendRoundRectPath(
+    ID2D1GeometrySink* sink,
+    const D2D1_RECT_F& rect,
+    float radiusX,
+    float radiusY,
+    bool roundTopLeft,
+    bool roundTopRight,
+    bool roundBottomRight,
+    bool roundBottomLeft) {
+  const float left = rect.left;
+  const float top = rect.top;
+  const float right = rect.right;
+  const float bottom = rect.bottom;
+  const float width = (std::max)(0.0f, right - left);
+  const float height = (std::max)(0.0f, bottom - top);
+  const float rx = (std::min)((std::max)(0.0f, radiusX), width / 2.0f);
+  const float ry = (std::min)((std::max)(0.0f, radiusY), height / 2.0f);
+  const bool anyRound = roundTopLeft || roundTopRight || roundBottomRight ||
+                        roundBottomLeft;
+
+  if (!anyRound || rx <= 0.0f || ry <= 0.0f) {
+    sink->BeginFigure(D2D1::Point2F(left, top), D2D1_FIGURE_BEGIN_FILLED);
+    sink->AddLine(D2D1::Point2F(right, top));
+    sink->AddLine(D2D1::Point2F(right, bottom));
+    sink->AddLine(D2D1::Point2F(left, bottom));
+    sink->EndFigure(D2D1_FIGURE_END_CLOSED);
+    return;
+  }
+
+  sink->BeginFigure(
+      D2D1::Point2F(left + (roundTopLeft ? rx : 0.0f), top),
+      D2D1_FIGURE_BEGIN_FILLED);
+
+  sink->AddLine(
+      D2D1::Point2F(right - (roundTopRight ? rx : 0.0f), top));
+  if (roundTopRight) {
+    sink->AddArc(D2D1::ArcSegment(
+        D2D1::Point2F(right, top + ry), D2D1::SizeF(rx, ry), 0.0f,
+        D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
+  }
+
+  sink->AddLine(
+      D2D1::Point2F(right, bottom - (roundBottomRight ? ry : 0.0f)));
+  if (roundBottomRight) {
+    sink->AddArc(D2D1::ArcSegment(
+        D2D1::Point2F(right - rx, bottom), D2D1::SizeF(rx, ry), 0.0f,
+        D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
+  }
+
+  sink->AddLine(
+      D2D1::Point2F(left + (roundBottomLeft ? rx : 0.0f), bottom));
+  if (roundBottomLeft) {
+    sink->AddArc(D2D1::ArcSegment(
+        D2D1::Point2F(left, bottom - ry), D2D1::SizeF(rx, ry), 0.0f,
+        D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
+  }
+
+  sink->AddLine(
+      D2D1::Point2F(left, top + (roundTopLeft ? ry : 0.0f)));
+  if (roundTopLeft) {
+    sink->AddArc(D2D1::ArcSegment(
+        D2D1::Point2F(left + rx, top), D2D1::SizeF(rx, ry), 0.0f,
+        D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
+  }
+
+  sink->EndFigure(D2D1_FIGURE_END_CLOSED);
+}
+
+void DirectWriteResources::FillRoundRect(const D2D1_RECT_F& rect,
+                                         const D2D1_COLOR_F& color,
+                                         float radiusX,
+                                         float radiusY,
+                                         bool roundTopLeft,
+                                         bool roundTopRight,
+                                         bool roundBottomRight,
+                                         bool roundBottomLeft) {
+  if (roundTopLeft && roundTopRight && roundBottomRight && roundBottomLeft &&
+      radiusX > 0.0f && radiusY > 0.0f) {
+    const D2D1_ROUNDED_RECT roundedRect =
+        D2D1::RoundedRect(rect, radiusX, radiusY);
+    pBrush->SetColor(color);
+    pRenderTarget->FillRoundedRectangle(&roundedRect, pBrush.Get());
+    return;
+  }
+  if ((!roundTopLeft && !roundTopRight && !roundBottomRight &&
+       !roundBottomLeft) ||
+      radiusX <= 0.0f || radiusY <= 0.0f) {
+    pBrush->SetColor(color);
+    pRenderTarget->FillRectangle(rect, pBrush.Get());
+    return;
+  }
+  ComPtr<ID2D1PathGeometry> path = CreateRoundRectGeometry(
+      rect, radiusX, radiusY, roundTopLeft, roundTopRight, roundBottomRight,
+      roundBottomLeft);
+  pBrush->SetColor(color);
+  pRenderTarget->FillGeometry(path.Get(), pBrush.Get());
+}
+
+void DirectWriteResources::DrawRoundRect(const D2D1_RECT_F& rect,
+                                         const D2D1_COLOR_F& color,
+                                         float strokeWidth,
+                                         float radiusX,
+                                         float radiusY,
+                                         bool roundTopLeft,
+                                         bool roundTopRight,
+                                         bool roundBottomRight,
+                                         bool roundBottomLeft) {
+  if (roundTopLeft && roundTopRight && roundBottomRight && roundBottomLeft &&
+      radiusX > 0.0f && radiusY > 0.0f) {
+    const D2D1_ROUNDED_RECT roundedRect =
+        D2D1::RoundedRect(rect, radiusX, radiusY);
+    pBrush->SetColor(color);
+    pRenderTarget->DrawRoundedRectangle(&roundedRect, pBrush.Get(),
+                                        strokeWidth);
+    return;
+  }
+  if ((!roundTopLeft && !roundTopRight && !roundBottomRight &&
+       !roundBottomLeft) ||
+      radiusX <= 0.0f || radiusY <= 0.0f) {
+    pBrush->SetColor(color);
+    pRenderTarget->DrawRectangle(rect, pBrush.Get(), strokeWidth);
+    return;
+  }
+  ComPtr<ID2D1PathGeometry> path = CreateRoundRectGeometry(
+      rect, radiusX, radiusY, roundTopLeft, roundTopRight, roundBottomRight,
+      roundBottomLeft);
+  pBrush->SetColor(color);
+  pRenderTarget->DrawGeometry(path.Get(), pBrush.Get(), strokeWidth);
+}
+
+void DirectWriteResources::DrawSoftShadow(const D2D1_RECT_F& rect,
+                                          float radius,
+                                          const D2D1_COLOR_F& color,
+                                          float blurRadius,
+                                          float offsetX,
+                                          float offsetY,
+                                          float blurMarginX,
+                                          float blurMarginY,
+                                          bool roundTopLeft,
+                                          bool roundTopRight,
+                                          bool roundBottomRight,
+                                          bool roundBottomLeft) {
+  if (!pRenderTarget || blurRadius <= 0.0f || color.a <= 0.0f)
+    return;
+
+  const float width = rect.right - rect.left;
+  const float height = rect.bottom - rect.top;
+  if (width <= 0.0f || height <= 0.0f)
+    return;
+
+  ComPtr<ID2D1DeviceContext> deviceContext;
+  if (FAILED(pRenderTarget.As(&deviceContext)) || !deviceContext)
+    return;
+
+  const float marginX = (std::max)(0.0f, blurMarginX);
+  const float marginY = (std::max)(0.0f, blurMarginY);
+  const UINT bitmapWidth =
+      static_cast<UINT>((std::max)(1.0f, width + marginX * 2.0f));
+  const UINT bitmapHeight =
+      static_cast<UINT>((std::max)(1.0f, height + marginY * 2.0f));
+
+  if (!pShadowBitmap || shadowBitmapWidth < bitmapWidth ||
+      shadowBitmapHeight < bitmapHeight) {
+    pShadowBitmap.Reset();
+    D2D1_BITMAP_PROPERTIES1 bitmapProperties = {};
+    bitmapProperties.pixelFormat =
+        D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM,
+                          D2D1_ALPHA_MODE_PREMULTIPLIED);
+    bitmapProperties.bitmapOptions = D2D1_BITMAP_OPTIONS_TARGET;
+    bitmapProperties.dpiX = 96.0f;
+    bitmapProperties.dpiY = 96.0f;
+    const D2D1_SIZE_U size = {bitmapWidth, bitmapHeight};
+    if (FAILED(deviceContext->CreateBitmap(
+            size, nullptr, 0, &bitmapProperties,
+            pShadowBitmap.ReleaseAndGetAddressOf())) ||
+        !pShadowBitmap) {
+      return;
+    }
+    shadowBitmapWidth = bitmapWidth;
+    shadowBitmapHeight = bitmapHeight;
+  }
+
+  if (!pShadowBlurEffect) {
+    if (FAILED(deviceContext->CreateEffect(
+            CLSID_D2D1GaussianBlur,
+            pShadowBlurEffect.ReleaseAndGetAddressOf())) ||
+        !pShadowBlurEffect) {
+      return;
+    }
+  }
+
+  ComPtr<ID2D1Image> originalTarget;
+  deviceContext->GetTarget(originalTarget.ReleaseAndGetAddressOf());
+  D2D1_MATRIX_3X2_F originalTransform;
+  deviceContext->GetTransform(&originalTransform);
+
+  deviceContext->SetTarget(pShadowBitmap.Get());
+  deviceContext->SetTransform(D2D1::Matrix3x2F::Identity());
+  deviceContext->Clear(D2D1::ColorF(0.0f, 0.0f, 0.0f, 0.0f));
+
+  const D2D1_RECT_F shadowRect =
+      D2D1::RectF(marginX + offsetX, marginY + offsetY,
+                  marginX + width + offsetX, marginY + height + offsetY);
+  FillRoundRect(shadowRect, color, radius, radius, roundTopLeft, roundTopRight,
+                roundBottomRight, roundBottomLeft);
+
+  deviceContext->SetTarget(originalTarget.Get());
+  deviceContext->SetTransform(originalTransform);
+
+  pShadowBlurEffect->SetInput(0, pShadowBitmap.Get());
+  pShadowBlurEffect->SetValue(D2D1_GAUSSIANBLUR_PROP_STANDARD_DEVIATION,
+                              blurRadius * 1.6f);//阴影模糊半径
+  pShadowBlurEffect->SetValue(D2D1_GAUSSIANBLUR_PROP_BORDER_MODE,
+                              D2D1_BORDER_MODE_HARD);
+  deviceContext->DrawImage(
+      pShadowBlurEffect.Get(),
+      D2D1::Point2F(rect.left - marginX, rect.top - marginY));
+}
+
+void DirectWriteResources::DrawSoftShadowBatch(
+    const std::vector<ShadowShape>& shapes,
+    const D2D1_COLOR_F& color,
+    float blurRadius,
+    float offsetX,
+    float offsetY,
+    float blurMarginX,
+    float blurMarginY) {
+  if (!pRenderTarget || shapes.empty() || blurRadius <= 0.0f ||
+      color.a <= 0.0f)
+    return;
+
+  ComPtr<ID2D1DeviceContext> deviceContext;
+  if (FAILED(pRenderTarget.As(&deviceContext)) || !deviceContext)
+    return;
+
+  const float marginX = (std::max)(0.0f, blurMarginX);
+  const float marginY = (std::max)(0.0f, blurMarginY);
+
+  float minX = shapes.front().rect.left - marginX;
+  float minY = shapes.front().rect.top - marginY;
+  float maxX = shapes.front().rect.right + marginX;
+  float maxY = shapes.front().rect.bottom + marginY;
+  for (const ShadowShape& shape : shapes) {
+    minX = (std::min)(minX, shape.rect.left - marginX);
+    minY = (std::min)(minY, shape.rect.top - marginY);
+    maxX = (std::max)(maxX, shape.rect.right + marginX);
+    maxY = (std::max)(maxY, shape.rect.bottom + marginY);
+  }
+
+  const float width = maxX - minX;
+  const float height = maxY - minY;
+  if (width <= 0.0f || height <= 0.0f)
+    return;
+
+  const UINT bitmapWidth =
+      static_cast<UINT>((std::max)(1.0f, std::ceil(width)));
+  const UINT bitmapHeight =
+      static_cast<UINT>((std::max)(1.0f, std::ceil(height)));
+
+  if (!pShadowBitmap || shadowBitmapWidth < bitmapWidth ||
+      shadowBitmapHeight < bitmapHeight) {
+    pShadowBitmap.Reset();
+    D2D1_BITMAP_PROPERTIES1 bitmapProperties = {};
+    bitmapProperties.pixelFormat =
+        D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM,
+                          D2D1_ALPHA_MODE_PREMULTIPLIED);
+    bitmapProperties.bitmapOptions = D2D1_BITMAP_OPTIONS_TARGET;
+    bitmapProperties.dpiX = 96.0f;
+    bitmapProperties.dpiY = 96.0f;
+    const D2D1_SIZE_U size = {bitmapWidth, bitmapHeight};
+    if (FAILED(deviceContext->CreateBitmap(
+            size, nullptr, 0, &bitmapProperties,
+            pShadowBitmap.ReleaseAndGetAddressOf())) ||
+        !pShadowBitmap) {
+      return;
+    }
+    shadowBitmapWidth = bitmapWidth;
+    shadowBitmapHeight = bitmapHeight;
+  }
+
+  if (!pShadowBlurEffect) {
+    if (FAILED(deviceContext->CreateEffect(
+            CLSID_D2D1GaussianBlur,
+            pShadowBlurEffect.ReleaseAndGetAddressOf())) ||
+        !pShadowBlurEffect) {
+      return;
+    }
+  }
+
+  ComPtr<ID2D1Image> originalTarget;
+  deviceContext->GetTarget(originalTarget.ReleaseAndGetAddressOf());
+  D2D1_MATRIX_3X2_F originalTransform;
+  deviceContext->GetTransform(&originalTransform);
+
+  deviceContext->SetTarget(pShadowBitmap.Get());
+  deviceContext->SetTransform(D2D1::Matrix3x2F::Identity());
+  deviceContext->Clear(D2D1::ColorF(0.0f, 0.0f, 0.0f, 0.0f));
+
+  for (const ShadowShape& shape : shapes) {
+    const D2D1_RECT_F localRect = D2D1::RectF(
+        shape.rect.left + offsetX - minX, shape.rect.top + offsetY - minY,
+        shape.rect.right + offsetX - minX, shape.rect.bottom + offsetY - minY);
+    FillRoundRect(localRect, color, shape.radius, shape.radius,
+                  shape.roundTopLeft, shape.roundTopRight,
+                  shape.roundBottomRight, shape.roundBottomLeft);
+  }
+
+  deviceContext->SetTarget(originalTarget.Get());
+  deviceContext->SetTransform(originalTransform);
+
+  pShadowBlurEffect->SetInput(0, pShadowBitmap.Get());
+  pShadowBlurEffect->SetValue(D2D1_GAUSSIANBLUR_PROP_STANDARD_DEVIATION,
+                              blurRadius * 1.6f);  // 阴影模糊半径
+  pShadowBlurEffect->SetValue(D2D1_GAUSSIANBLUR_PROP_BORDER_MODE,
+                              D2D1_BORDER_MODE_HARD);
+  deviceContext->DrawImage(pShadowBlurEffect.Get(),
+                           D2D1::Point2F(minX, minY));
+}
+
+void DirectWriteResources::FillRoundRectBatch(
+    const std::vector<ShadowShape>& shapes,
+    const D2D1_COLOR_F& color) {
+  if (shapes.empty() || !pRenderTarget || color.a <= 0.0f)
+    return;
+  ComPtr<ID2D1PathGeometry> path = CreateRoundRectGeometryBatch(shapes);
+  if (!path)
+    return;
+  pBrush->SetColor(color);
+  pRenderTarget->FillGeometry(path.Get(), pBrush.Get());
+}
+
+void DirectWriteResources::DrawRoundRectBatch(
+    const std::vector<ShadowShape>& shapes,
+    const D2D1_COLOR_F& color,
+    float strokeWidth) {
+  if (shapes.empty() || !pRenderTarget || color.a <= 0.0f || strokeWidth <= 0.0f)
+    return;
+  ComPtr<ID2D1PathGeometry> path = CreateRoundRectGeometryBatch(shapes);
+  if (!path)
+    return;
+  pBrush->SetColor(color);
+  pRenderTarget->DrawGeometry(path.Get(), pBrush.Get(), strokeWidth);
+}
 
 HRESULT DirectWriteResources::InitResources(const wstring& label_font_face,
                                             const int& label_font_point,
@@ -95,9 +588,11 @@ HRESULT DirectWriteResources::InitResources(const wstring& label_font_face,
   if (_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT)
     baseline = linespacing / 2;
 
+  // `vertical` is only set for the formats used by the candidate columns: the
+  // encoding (preedit) text is always laid out horizontally in the upper band.
   auto init_font = [&](const wstring& fontface, int fontpoint,
                        ComPtr<IDWriteTextFormat1>& _pTextFormat,
-                       DWRITE_WORD_WRAPPING wrap) {
+                       DWRITE_WORD_WRAPPING wrap, bool vertical) {
     vector<wstring> fontFaceStrVector;
     // text font text format set up
     fontFaceStrVector = ws_split(fontface, L",");
@@ -113,13 +608,16 @@ HRESULT DirectWriteResources::InitResources(const wstring& label_font_face,
                                  reinterpret_cast<IDWriteTextFormat**>(
                                      _pTextFormat.ReleaseAndGetAddressOf()));
     if (_pTextFormat != NULL) {
-      if (vertical_text) {
+      if (vertical) {
         HR(_pTextFormat->SetFlowDirection(flow));
         HR(_pTextFormat->SetReadingDirection(
             DWRITE_READING_DIRECTION_TOP_TO_BOTTOM));
-        HR(_pTextFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING));
-      } else
-        HR(_pTextFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING));
+        // keep every glyph upright and stack the glyphs along the column
+        // instead of rotating them 90 degrees
+        HR(_pTextFormat->SetVerticalGlyphOrientation(
+            DWRITE_VERTICAL_GLYPH_ORIENTATION_STACKED));
+      }
+      HR(_pTextFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING));
 
       HR(_pTextFormat->SetParagraphAlignment(
           DWRITE_PARAGRAPH_ALIGNMENT_CENTER));
@@ -132,11 +630,12 @@ HRESULT DirectWriteResources::InitResources(const wstring& label_font_face,
     }
     decltype(fontFaceStrVector)().swap(fontFaceStrVector);
   };
-  init_font(font_face, font_point, pTextFormat, wrapping);
-  init_font(font_face, font_point, pPreeditTextFormat, wrapping_preedit);
-  init_font(label_font_face, label_font_point, pLabelTextFormat, wrapping);
-  init_font(comment_font_face, comment_font_point, pCommentTextFormat,
-            wrapping);
+  init_font(font_face, font_point, pTextFormat, wrapping, vertical_text);
+  init_font(font_face, font_point, pPreeditTextFormat, wrapping_preedit, false);
+  init_font(label_font_face, label_font_point, pLabelTextFormat, wrapping,
+            vertical_text);
+  init_font(comment_font_face, comment_font_point, pCommentTextFormat, wrapping,
+            vertical_text);
   return S_OK;
 }
 

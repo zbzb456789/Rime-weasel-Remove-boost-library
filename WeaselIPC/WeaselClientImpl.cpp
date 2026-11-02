@@ -55,13 +55,31 @@ void ClientImpl::ShutdownServer() {
   _SendMessage(WEASEL_IPC_SHUTDOWN_SERVER, 0, 0);
 }
 
-bool ClientImpl::ProcessKeyEvent(KeyEvent const& keyEvent) {
-  if (!_Active())
-    return false;
+bool ClientImpl::ProcessKeyEvent(KeyEvent const& keyEvent,
+                                 bool* session_invalid) {
+  if (session_invalid)
+    *session_invalid = false;
 
-  LRESULT ret =
-      _SendMessage(WEASEL_IPC_PROCESS_KEY_EVENT, keyEvent, session_id);
-  return ret != 0;
+  if (!_Active()) {
+    if (session_invalid)
+      *session_invalid = true;
+    return false;
+  }
+
+  try {
+    PipeMessage req{WEASEL_IPC_PROCESS_KEY_EVENT, keyEvent, session_id};
+    LRESULT ret = channel.Transact(req);
+    if (ret == WEASEL_IPC_SESSION_INVALID) {
+      if (session_invalid)
+        *session_invalid = true;
+      return false;
+    }
+    return ret != 0;
+  } catch (DWORD) {
+    if (session_invalid)
+      *session_invalid = true;
+    return false;
+  }
 }
 
 bool ClientImpl::CommitComposition() {
@@ -220,8 +238,8 @@ void Client::ShutdownServer() {
   m_pImpl->ShutdownServer();
 }
 
-bool Client::ProcessKeyEvent(KeyEvent const& keyEvent) {
-  return m_pImpl->ProcessKeyEvent(keyEvent);
+bool Client::ProcessKeyEvent(KeyEvent const& keyEvent, bool* session_invalid) {
+  return m_pImpl->ProcessKeyEvent(keyEvent, session_invalid);
 }
 
 bool Client::CommitComposition() {

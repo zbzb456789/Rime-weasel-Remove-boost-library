@@ -4,6 +4,7 @@
 #include <windows.h>
 #include <thread>
 #include <sstream>
+#include <algorithm>
 
 namespace weasel {
 
@@ -13,9 +14,15 @@ class wbufferstream : public std::wiostream {
       setp(b, b + sz);
       setg(b, b, b + sz);
     }
+    size_t written_chars() const {
+      return static_cast<size_t>(pptr() - pbase());
+    }
   } buf;
 public:
   wbufferstream(wchar_t* b, size_t sz) : std::wiostream(&buf), buf(b, sz) {}
+  size_t written_bytes() const {
+    return buf.written_chars() * sizeof(wchar_t);
+  }
 };
 
 class PipeChannelBase {
@@ -45,6 +52,7 @@ class PipeChannelBase {
  protected:
   std::wstring pname;
   HANDLE hpipe;
+  bool is_server_ = false;
 
   bool has_body;
   const size_t buff_size;
@@ -135,7 +143,11 @@ class PipeChannel : public PipeChannelBase {
     DWORD lwritten = 0;
 
     *reinterpret_cast<Msg*>(pbuff) = msg;
-    size_t data_sz = has_body ? buff_size : _MsgSize;
+    size_t data_sz = _MsgSize;
+    if (has_body) {
+      data_sz += write_stream ? write_stream->written_bytes() : 0;
+      data_sz = (std::min)(data_sz, buff_size);
+    }
 
     try {
       _WritePipe(pipe, data_sz, pbuff);

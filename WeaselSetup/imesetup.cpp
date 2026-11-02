@@ -1,4 +1,4 @@
-﻿#include "stdafx.h"
+#include "stdafx.h"
 #include <string>
 #include <vector>
 #include <msctf.h>
@@ -8,34 +8,34 @@
 #include <WeaselUtility.h>
 #include "InstallOptionsDlg.h"
 
-// {A3F4CDED-B1E9-41EE-9CA6-7B4D0DE6CB0A}
+// {2451E61B-D739-4A7F-B319-970A057DE399}
 static const GUID c_clsidTextService = {
-    0xa3f4cded,
-    0xb1e9,
-    0x41ee,
-    {0x9c, 0xa6, 0x7b, 0x4d, 0xd, 0xe6, 0xcb, 0xa}};
+    0x2451e61b,
+    0xd739,
+    0x4a7f,
+    {0xb3, 0x19, 0x97, 0x0a, 0x05, 0x7d, 0xe3, 0x99}};
 
-// {3D02CAB6-2B8E-4781-BA20-1C9267529467}
+// {A1429FAE-4AC6-432B-BA08-D1DD8C8514EE}
 static const GUID c_guidProfile = {
-    0x3d02cab6,
-    0x2b8e,
-    0x4781,
-    {0xba, 0x20, 0x1c, 0x92, 0x67, 0x52, 0x94, 0x67}};
+    0xa1429fae,
+    0x4ac6,
+    0x432b,
+    {0xba, 0x08, 0xd1, 0xdd, 0x8c, 0x85, 0x14, 0xee}};
 
 // if in the future, option hant is extended, maybe a function to generate this
 // info is required
 #define PSZTITLE_HANS                                                     \
-  L"0804:{A3F4CDED-B1E9-41EE-9CA6-7B4D0DE6CB0A}{3D02CAB6-2B8E-4781-BA20-" \
-  L"1C9267529467}"
+  L"0804:{2451E61B-D739-4A7F-B319-970A057DE399}{A1429FAE-4AC6-432B-BA08-" \
+  L"D1DD8C8514EE}"
 #define PSZTITLE_HANT                                                     \
-  L"0404:{A3F4CDED-B1E9-41EE-9CA6-7B4D0DE6CB0A}{3D02CAB6-2B8E-4781-BA20-" \
-  L"1C9267529467}"
+  L"0404:{2451E61B-D739-4A7F-B319-970A057DE399}{A1429FAE-4AC6-432B-BA08-" \
+  L"D1DD8C8514EE}"
 #define ILOT_UNINSTALL 0x00000001
 typedef HRESULT(WINAPI* PTF_INSTALLLAYOUTORTIP)(LPCWSTR psz, DWORD dwFlags);
 
 #define WEASEL_WER_KEY                            \
   L"SOFTWARE\\Microsoft\\Windows\\Windows Error " \
-  L"Reporting\\LocalDumps\\WeaselServer.exe"
+  L"Reporting\\LocalDumps\\RimeUIServer.exe"
 
 BOOL copy_file(const std::wstring& src, const std::wstring& dest) {
   BOOL ret = CopyFile(src.c_str(), dest.c_str(), FALSE);
@@ -126,7 +126,7 @@ int install_ime_file(std::wstring& srcPath,
   WCHAR path[MAX_PATH];
   GetModuleFileNameW(GetModuleHandle(NULL), path, _countof(path));
 
-  std::wstring srcFileName = L"weasel";
+  std::wstring srcFileName = L"rimeui";
 
   srcFileName += ext;
   WCHAR drive[_MAX_DRIVE];
@@ -136,7 +136,7 @@ int install_ime_file(std::wstring& srcPath,
   srcPath = std::wstring(drive) + dir + srcFileName;
 
   GetSystemDirectoryW(path, _countof(path));
-  std::wstring destPath = std::wstring(path) + L"\\weasel" + ext;
+  std::wstring destPath = std::wstring(path) + L"\\rimeui" + ext;
 
   int retval = 0;
   // 复制 .dll/.ime 到系统目录
@@ -168,7 +168,7 @@ int install_ime_file(std::wstring& srcPath,
         std::wstring srcPathARM32 = srcPath;
         ireplace_last(srcPathARM32, ext, L"ARM" + ext);
 
-        std::wstring destPathARM32 = std::wstring(sysarm32) + L"\\weasel" + ext;
+        std::wstring destPathARM32 = std::wstring(sysarm32) + L"\\rimeui" + ext;
         if (!copy_file(srcPathARM32, destPathARM32)) {
           MSG_NOT_SILENT_ID_CAP(silent, destPathARM32.c_str(),
                                 IDS_STR_INSTALL_FAILED, MB_ICONERROR | MB_OK);
@@ -178,9 +178,9 @@ int install_ime_file(std::wstring& srcPath,
       }
 
       // Then install the ARM64 (and x64) version.
-      // On ARM64 weasel.dll(ime) is an ARM64X redirection DLL (weaselARM64X).
-      // When loaded, it will be redirected to weaselARM64.dll(ime) on ARM64
-      // processes, and weaselx64.dll(ime) on x64 processes. So we need a total
+      // On ARM64 rimeui.dll(ime) is an ARM64X redirection DLL (rimeuiARM64X).
+      // When loaded, it will be redirected to rimeuiARM64.dll(ime) on ARM64
+      // processes, and rimeuix64.dll(ime) on x64 processes. So we need a total
       // of three files.
 
       std::wstring srcPathX64 = srcPath;
@@ -203,9 +203,9 @@ int install_ime_file(std::wstring& srcPath,
         return 1;
       }
 
-      // Since weaselARM64X is just a redirector we don't have separate
+      // Since rimeuiARM64X is just a redirector we don't have separate
       // HANS and HANT variants.
-      srcPath = std::wstring(drive) + dir + L"weaselARM64X" + ext;
+      srcPath = std::wstring(drive) + dir + L"rimeuiARM64X" + ext;
     } else {
       ireplace_last(srcPath, ext, L"x64" + ext);
     }
@@ -232,7 +232,7 @@ int uninstall_ime_file(const std::wstring& ext,
   WCHAR path[MAX_PATH];
   GetSystemDirectoryW(path, _countof(path));
   std::wstring imePath(path);
-  imePath += L"\\weasel" + ext;
+  imePath += L"\\rimeui" + ext;
   retval += func(imePath, false, false, false, false, silent);
   delete_file(imePath);
   if (is_wow64()) {
@@ -247,7 +247,7 @@ int uninstall_ime_file(const std::wstring& ext,
     if (is_arm64_machine()) {
       WCHAR sysarm32[MAX_PATH];
       if (get_wow_arm32_system_dir(sysarm32, _countof(sysarm32)) > 0) {
-        std::wstring imePathARM32 = std::wstring(sysarm32) + L"\\weasel" + ext;
+        std::wstring imePathARM32 = std::wstring(sysarm32) + L"\\rimeui" + ext;
         retval += func(imePathARM32, false, true, true, false, silent);
         delete_file(imePathARM32);
       }
@@ -306,7 +306,7 @@ int register_ime(const std::wstring& ime_path,
             ret = RegQueryValueEx(hSubKey, L"Ime File", NULL, &type,
                                   (LPBYTE)imeFile, &len);
             if (ret = ERROR_SUCCESS) {
-              if (_wcsicmp(imeFile, L"weasel.ime") == 0) {
+              if (_wcsicmp(imeFile, L"rimeui.ime") == 0) {
                 hKL = (HKL)k;  // already there
               }
             }
@@ -315,7 +315,7 @@ int register_ime(const std::wstring& ime_path,
             // found a spare number to register
             ret = RegCreateKey(hKey, hkl_str, &hSubKey);
             if (ret == ERROR_SUCCESS) {
-              const WCHAR ime_file[] = L"weasel.ime";
+              const WCHAR ime_file[] = L"rimeui.ime";
               RegSetValueEx(hSubKey, L"Ime File", 0, REG_SZ, (LPBYTE)ime_file,
                             sizeof(ime_file));
               const WCHAR layout_file[] = L"kbdus.dll";
@@ -401,7 +401,7 @@ int register_ime(const std::wstring& ime_path,
         continue;
 
       // 小狼毫?
-      if (_wcsicmp(imeFile, L"weasel.ime") == 0) {
+      if (_wcsicmp(imeFile, L"rimeui.ime") == 0) {
         DWORD value;
         swscanf_s(subKey, L"%x", &value);
         UnloadKeyboardLayout((HKL)value);
@@ -560,7 +560,7 @@ int install(bool hant, bool silent, bool old_ime_support) {
                 _countof(dir), NULL, 0, NULL, 0);
   std::wstring rootDir = std::wstring(drive) + dir;
   rootDir.pop_back();
-  auto ret = SetRegKeyValue(HKEY_LOCAL_MACHINE, WEASEL_REG_KEY, L"WeaselRoot",
+  auto ret = SetRegKeyValue(HKEY_LOCAL_MACHINE, WEASEL_REG_KEY, L"RimeUIRoot",
                             rootDir.c_str(), REG_SZ);
   if (FAILED(HRESULT_FROM_WIN32(ret))) {
     MSG_NOT_SILENT_BY_IDS(silent, IDS_STR_ERRWRITEWEASELROOT,
@@ -568,7 +568,7 @@ int install(bool hant, bool silent, bool old_ime_support) {
     return 1;
   }
 
-      const std::wstring_view executable = L"WeaselServer.exe";
+      const std::wstring_view executable = L"RimeUIServer.exe";
   ret = SetRegKeyValue(HKEY_LOCAL_MACHINE, WEASEL_REG_KEY, L"ServerExecutable",
                        executable.data(), REG_SZ);
   if (FAILED(HRESULT_FROM_WIN32(ret))) {
@@ -623,7 +623,7 @@ int uninstall(bool silent) {
   // 注销输入法
   int retval = 0;
 
-  const WCHAR KEY[] = L"Software\\Rime\\Weasel";
+  const WCHAR KEY[] = L"Software\\RimeUI";
   HKEY hKey;
   LSTATUS ret = RegOpenKey(HKEY_CURRENT_USER, KEY, &hKey);
   if (ret == ERROR_SUCCESS) {
@@ -658,7 +658,7 @@ int uninstall(bool silent) {
 
   // delete WER register,
   // "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\Windows Error
-  // Reporting\\LocalDumps\\WeaselServer.exe" no WOW64 redirect
+  // Reporting\\LocalDumps\\RimeUIServer.exe" no WOW64 redirect
 
   auto flag_wow64 = is_wow64() ? KEY_WOW64_64KEY : 0;
   RegDeleteKeyEx(HKEY_LOCAL_MACHINE, WEASEL_WER_KEY, flag_wow64, 0);
@@ -675,7 +675,7 @@ bool has_installed() {
   WCHAR path[MAX_PATH];
   GetSystemDirectory(path, _countof(path));
   std::wstring sysPath(path);
-  DWORD attr = GetFileAttributesW((sysPath + L"\\weasel.dll").c_str());
+  DWORD attr = GetFileAttributesW((sysPath + L"\\rimeui.dll").c_str());
   return (attr != INVALID_FILE_ATTRIBUTES &&
           !(attr & FILE_ATTRIBUTE_DIRECTORY));
 }

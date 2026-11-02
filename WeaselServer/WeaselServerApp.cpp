@@ -22,7 +22,7 @@ int WeaselServerApp::Run() {
     return -1;
 
   // win_sparkle_set_appcast_url("http://localhost:8000/weasel/update/appcast.xml");
-  win_sparkle_set_registry_path("Software\\Rime\\Weasel\\Updates");
+  win_sparkle_set_registry_path("Software\\RimeUI\\Updates");
   if (GetThreadUILanguage() ==
       MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_TRADITIONAL))
     win_sparkle_set_lang("zh-TW");
@@ -55,28 +55,20 @@ void WeaselServerApp::SetupMenuHandlers() {
   m_server->AddMenuHandler(ID_WEASELTRAY_QUIT,
                            [this] { return m_server->Stop() == 0; });
   m_server->AddMenuHandler(ID_WEASELTRAY_DEPLOY,
-                           std::bind(execute, dir / L"WeaselDeployer.exe",
+                           std::bind(execute, dir / L"RimeUIDeployer.exe",
                                      std::wstring(L"/deploy")));
   m_server->AddMenuHandler(
       ID_WEASELTRAY_SETTINGS,
-      std::bind(execute, dir / L"WeaselDeployer.exe", std::wstring()));
+      std::bind(execute, dir / L"RimeUIDeployer.exe", std::wstring()));
   m_server->AddMenuHandler(
       ID_WEASELTRAY_DICT_MANAGEMENT,
-      std::bind(execute, dir / L"WeaselDeployer.exe", std::wstring(L"/dict")));
-  m_server->AddMenuHandler(
-      ID_WEASELTRAY_SYNC,
-      std::bind(execute, dir / L"WeaselDeployer.exe", std::wstring(L"/sync")));
-  m_server->AddMenuHandler(ID_WEASELTRAY_WIKI,
-                           std::bind(open, L"https://rime.im/docs/"));
-  m_server->AddMenuHandler(ID_WEASELTRAY_HOMEPAGE,
-                           std::bind(open, L"https://rime.im/"));
-  m_server->AddMenuHandler(ID_WEASELTRAY_FORUM,
-      std::bind(execute, dir / L"WeaselSettings.exe",
-                std::wstring()));
-  m_server->AddMenuHandler(ID_WEASELTRAY_CHECKUPDATE, check_update);
+      std::bind(execute, dir / L"RimeUIDeployer.exe", std::wstring(L"/dict")));
+  m_server->AddMenuHandler(ID_WEASELTRAY_SYNC, std::bind(execute, dir / L"uninstall.exe", std::wstring()));
+  m_server->AddMenuHandler(ID_WEASELTRAY_WIKI, std::bind(open, L"https://rime.im/docs/"));
+  m_server->AddMenuHandler(ID_WEASELTRAY_HOMEPAGE, std::bind(open, L"https://rime.im/"));
+  m_server->AddMenuHandler(ID_WEASELTRAY_FORUM, std::bind(execute, dir / L"RimeUISettings.exe", std::wstring()));
+  m_server->AddMenuHandler(ID_WEASELTRAY_CHECKUPDATE, std::bind(open, L"https://wwbao.lanzouq.com/b00hrn5mef"));
   m_server->AddMenuHandler(ID_WEASELTRAY_INSTALLDIR, std::bind(explore, dir));
-  m_server->AddMenuHandler(ID_WEASELTRAY_USERCONFIG,
-                           std::bind(explore, WeaselUserDataPath()));
-  m_server->AddMenuHandler(ID_WEASELTRAY_LOGDIR,
-                           std::bind(explore, WeaselLogPath()));
+  m_server->AddMenuHandler(ID_WEASELTRAY_USERCONFIG, std::bind(explore, WeaselUserDataPath()));
+  m_server->AddMenuHandler(ID_WEASELTRAY_LOGDIR, std::bind(explore, WeaselLogPath()));
 }

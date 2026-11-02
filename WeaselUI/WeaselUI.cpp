@@ -86,7 +86,8 @@ bool UI::Create(HWND parent) {
   if (pimpl_) {
     pimpl_->panel.Create(
         parent, 0, 0, WS_POPUP,
-        WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE | WS_EX_TRANSPARENT,
+        WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE |
+            WS_EX_TRANSPARENT | WS_EX_NOREDIRECTIONBITMAP,
         0U, 0);
     return true;
   }
@@ -97,7 +98,8 @@ bool UI::Create(HWND parent) {
 
   pimpl_->panel.Create(
       parent, 0, 0, WS_POPUP,
-      WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE | WS_EX_TRANSPARENT,
+      WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE |
+          WS_EX_TRANSPARENT | WS_EX_NOREDIRECTIONBITMAP,
       0U, 0);
   return true;
 }

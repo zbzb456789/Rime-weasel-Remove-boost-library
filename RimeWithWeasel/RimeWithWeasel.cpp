@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <map>
 #include <regex>
+#include <atomic>
 #include <rime_api.h>
 
 #define TRANSPARENT_COLOR 0x00000000
@@ -80,14 +81,24 @@ void _RefreshTrayIcon(const RimeSessionId session_id,
                       const std::function<void()>& _UpdateUICallback) {
   // Dangerous, don't touch
   static char app_name[256] = {0};
+  static std::atomic<bool> refresh_pending{false};
   auto ret = rime_api->get_property(session_id, "client_app", app_name,
                                     sizeof(app_name) - 1);
   if (!ret || u8tow(app_name) == std::wstring(L"explorer.exe")) {
-    std::thread([=]() {
-      ::Sleep(100);
-      if (_UpdateUICallback)
-        _UpdateUICallback();
-    }).detach();  // 显式分离，不再阻塞主线程
+    if (!_UpdateUICallback)
+      return;
+    bool expected = false;
+    if (!refresh_pending.compare_exchange_strong(expected, true))
+      return;
+    try {
+      std::thread([cb = _UpdateUICallback]() {
+        ::Sleep(100);
+        refresh_pending.store(false);
+        cb();
+      }).detach();
+    } catch (...) {
+      refresh_pending.store(false);
+    }
   } else if (_UpdateUICallback) {
     _UpdateUICallback();
   }
@@ -104,7 +115,7 @@ void RimeWithWeaselHandler::_Setup() {
   weasel_traits.distribution_name = distribution_name.c_str();
   weasel_traits.distribution_code_name = WEASEL_CODE_NAME;
   weasel_traits.distribution_version = WEASEL_VERSION;
-  weasel_traits.app_name = "rime.weasel";
+  weasel_traits.app_name = "rime.rimeui";
   std::string log_dir = wtou8(WeaselLogPath().wstring());
   weasel_traits.log_dir = log_dir.c_str();
   rime_api->setup(&weasel_traits);
@@ -120,7 +131,11 @@ void RimeWithWeaselHandler::Initialize() {
   LOG(INFO) << "Initializing la rime.";
   rime_api->initialize(NULL);
   if (rime_api->start_maintenance(/*full_check = */ False)) {
-    m_disabled = true;
+    // 启动阶段的维护在这里等待完成，避免服务已就绪但会话被禁用，
+    // 导致用户必须按一次键才触发恢复。
+    LOG(INFO) << "Waiting for rime maintenance to finish.";
+    rime_api->join_maintenance_thread();
+    LOG(INFO) << "Rime maintenance finished.";
   }
 
   RimeConfig config = {NULL};
@@ -478,7 +493,7 @@ void RimeWithWeaselHandler::_GetCandidateInfo(CandidateInfo& cinfo,
       cinfo.labels[i].str =
           escape_string(std::wstring(1, ctx.menu.select_keys[i]));
     } else {
-      cinfo.labels[i].str = std::to_wstring((i + 1) % 10);
+      cinfo.labels[i].str = std::to_wstring(i + 1);
     }
   }
   cinfo.highlighted = ctx.menu.highlighted_candidate_index;
@@ -521,7 +536,7 @@ void RimeWithWeaselHandler::OnUpdateUI(const std::function<void()>& cb) {
 }
 
 bool RimeWithWeaselHandler::_IsDeployerRunning() {
-  HANDLE hMutex = CreateMutex(NULL, TRUE, L"WeaselDeployerMutex");
+  HANDLE hMutex = CreateMutex(NULL, TRUE, L"RimeUIDeployerMutex");
   bool deployer_detected = hMutex && GetLastError() == ERROR_ALREADY_EXISTS;
   if (hMutex) {
     CloseHandle(hMutex);
@@ -629,8 +644,7 @@ void RimeWithWeaselHandler::_LoadSchemaSpecificSettings(
       }
       return std::wstring();
     };
-    style.current_zhung_icon =
-        load_icon(config, "schema/icon", "schema/zhung_icon");
+    style.current_zhung_icon = load_icon(config, "schema/icon", "schema/zhung_icon");
     style.current_ascii_icon = load_icon(config, "schema/ascii_icon", NULL);
     style.current_full_icon = load_icon(config, "schema/full_icon", NULL);
     style.current_half_icon = load_icon(config, "schema/half_icon", NULL);
@@ -708,14 +722,14 @@ bool RimeWithWeaselHandler::_ShowMessage(Context& ctx, Status& status) {
     else if (m_message_value == "failure") {
       if (GetThreadUILanguage() ==
           MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_TRADITIONAL))
-        tips = L"有錯誤，請查看日誌 %TEMP%\\rime.weasel\\rime.weasel.*.INFO";
+        tips = L"有錯誤，請查看日誌 %TEMP%\\rime.ui\\rime.rimeui.*.INFO";
       else if (GetThreadUILanguage() ==
                MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED))
-        tips = L"有错误，请查看日志 %TEMP%\\rime.weasel\\rime.weasel.*.INFO";
+        tips = L"有错误，请查看日志 %TEMP%\\rime.ui\\rime.rimeui.*.INFO";
       else
         tips =
             L"There is an error, please check the logs "
-            L"%TEMP%\\rime.weasel\\rime.weasel.*.INFO";
+            L"%TEMP%\\rime.ui\\rime.rimeui.*.INFO";
     }
   } else if (m_message_type == "schema") {
     tips = /*L"【" + */ status.schema_name /* + L"】"*/;
@@ -754,15 +768,48 @@ inline std::string _GetLabelText(const std::vector<Text>& labels,
   return wtou8(std::wstring(buffer));
 }
 
+// 计算候选列表中“内容部分”的签名，忽略高亮和页码等轻量字段。
+static size_t _CandidateSignature(const weasel::CandidateInfo& cinfo) {
+  size_t hash = 1469598103934665603ull;
+  const auto mix_bytes = [&hash](const void* data, size_t size) {
+    const unsigned char* p = static_cast<const unsigned char*>(data);
+    for (size_t i = 0; i < size; ++i) {
+      hash ^= p[i];
+      hash *= 1099511628211ull;
+    }
+  };
+  const auto mix_string = [&hash, &mix_bytes](const std::wstring& str) {
+    mix_bytes(str.data(), str.size() * sizeof(wchar_t));
+    const size_t size = str.size();
+    mix_bytes(&size, sizeof(size));
+  };
+  const size_t counts[] = {cinfo.candies.size(), cinfo.labels.size(),
+                           cinfo.comments.size()};
+  mix_bytes(counts, sizeof(counts));
+  for (const auto& text : cinfo.candies)
+    mix_string(text.str);
+  for (const auto& text : cinfo.labels)
+    mix_string(text.str);
+  for (const auto& text : cinfo.comments)
+    mix_string(text.str);
+  return hash;
+}
+
 bool RimeWithWeaselHandler::_Respond(WeaselSessionId ipc_id, EatLine eat) {
-  std::set<std::string> actions;
-  std::list<std::string> messages;
+  std::vector<std::string> actions;
+  actions.reserve(6);
+  const auto add_action = [&actions](const char* action) {
+    if (std::find(actions.begin(), actions.end(), action) == actions.end())
+      actions.emplace_back(action);
+  };
+  std::vector<std::string> messages;
+  messages.reserve(64);
 
   SessionStatus& session_status = get_session_status(ipc_id);
   RimeSessionId session_id = session_status.session_id;
   RIME_STRUCT(RimeCommit, commit);
   if (rime_api->get_commit(session_id, &commit)) {
-    actions.insert("commit");
+    add_action("commit");
 
     std::string commit_text = escape_string<char>(commit.text);
     messages.push_back(std::string("commit=") + commit_text + '\n');
@@ -773,7 +820,7 @@ bool RimeWithWeaselHandler::_Respond(WeaselSessionId ipc_id, EatLine eat) {
   RIME_STRUCT(RimeStatus, status);
   if (rime_api->get_status(session_id, &status)) {
     is_composing = !!status.is_composing;
-    actions.insert("status");
+    add_action("status");
     messages.push_back(std::string("status.ascii_mode=") +
                        std::to_string(status.is_ascii_mode) + '\n');
     messages.push_back(std::string("status.composing=") +
@@ -804,7 +851,8 @@ bool RimeWithWeaselHandler::_Respond(WeaselSessionId ipc_id, EatLine eat) {
       _GetCandidateInfo(cinfo, ctx);
     }
     if (is_composing) {
-      actions.insert("ctx");
+      add_action("ctx");
+      session_status.__ctx_synced = true;
       switch (session_status.style.preedit_type) {
         case UIStyle::PREVIEW:
           if (ctx.commit_text_preview != NULL) {
@@ -878,20 +926,78 @@ bool RimeWithWeaselHandler::_Respond(WeaselSessionId ipc_id, EatLine eat) {
           }
           break;
       }
+    } else if (session_status.__ctx_synced) {
+      // 组合结束后清掉客户端持久 Context 中的 preedit/aux，避免残留。
+      add_action("ctx");
+      messages.push_back(std::string("ctx.preedit=\n"));
+      messages.push_back(std::string("ctx.aux=\n"));
     }
     if (has_candidates) {
-      std::wstringstream ss;
-      weasel::archive::text_woarchive oa(ss);
-
-      oa << cinfo;
-
-      messages.push_back(std::string("ctx.cand=") + wtou8(ss.str()) + '\n');
+      const size_t cand_sig = _CandidateSignature(cinfo);
+      const bool send_full =
+          !session_status.__cand_synced ||
+          cand_sig != session_status.__cand_sig;
+      if (send_full) {
+        std::wstringstream ss;
+        weasel::archive::text_woarchive oa(ss);
+        oa << cinfo;
+        add_action("ctx");
+        messages.push_back(std::string("ctx.cand=") + wtou8(ss.str()) + '\n');
+        session_status.__cand_sig = cand_sig;
+        session_status.__cand_synced = true;
+        session_status.__cand_highlighted = cinfo.highlighted;
+        session_status.__cand_page = cinfo.currentPage;
+        session_status.__cand_total_pages = cinfo.totalPages;
+        session_status.__cand_is_last_page = cinfo.is_last_page;
+        session_status.__ctx_synced = true;
+      } else {
+        bool changed = false;
+        if (cinfo.highlighted != session_status.__cand_highlighted) {
+          messages.push_back(std::string("ctx.cand.highlighted=") +
+                             std::to_string(cinfo.highlighted) + '\n');
+          session_status.__cand_highlighted = cinfo.highlighted;
+          changed = true;
+        }
+        if (cinfo.currentPage != session_status.__cand_page) {
+          messages.push_back(std::string("ctx.cand.currentPage=") +
+                             std::to_string(cinfo.currentPage) + '\n');
+          session_status.__cand_page = cinfo.currentPage;
+          changed = true;
+        }
+        if (cinfo.totalPages != session_status.__cand_total_pages) {
+          messages.push_back(std::string("ctx.cand.totalPages=") +
+                             std::to_string(cinfo.totalPages) + '\n');
+          session_status.__cand_total_pages = cinfo.totalPages;
+          changed = true;
+        }
+        if (cinfo.is_last_page != session_status.__cand_is_last_page) {
+          messages.push_back(std::string("ctx.cand.is_last_page=") +
+                             std::to_string(cinfo.is_last_page ? 1 : 0) + '\n');
+          session_status.__cand_is_last_page = cinfo.is_last_page;
+          changed = true;
+        }
+        if (changed) {
+          add_action("ctx");
+          session_status.__ctx_synced = true;
+        }
+      }
+    } else if (session_status.__cand_synced) {
+      add_action("ctx");
+      messages.push_back(std::string("ctx.cand.clear=1\n"));
+      session_status.__cand_synced = false;
+      session_status.__cand_sig = 0;
+      session_status.__cand_highlighted = -1;
+      session_status.__cand_page = -1;
+      session_status.__cand_total_pages = -1;
+      session_status.__cand_is_last_page = false;
+      if (!is_composing)
+        session_status.__ctx_synced = false;
     }
     rime_api->free_context(&ctx);
   }
 
   // configuration information
-  actions.insert("config");
+  add_action("config");
   messages.push_back(std::string("config.inline_preedit=") +
                      std::to_string((int)session_status.style.inline_preedit) +
                      '\n');
@@ -902,7 +1008,7 @@ bool RimeWithWeaselHandler::_Respond(WeaselSessionId ipc_id, EatLine eat) {
     weasel::archive::text_woarchive oa(ss);
     oa << session_status.style;
 
-    actions.insert("style");
+    add_action("style");
     messages.push_back(std::string("style=") + wtou8(ss.str().c_str()) + '\n');
     session_status.__synced = true;
   }
@@ -919,11 +1025,18 @@ bool RimeWithWeaselHandler::_Respond(WeaselSessionId ipc_id, EatLine eat) {
 
   messages.push_back(std::string(".\n"));
 
-  return std::all_of(messages.begin(), messages.end(),
-                     [&eat](std::string& msg) {
-                       auto wmsg = u8tow(msg);
-                       return eat(wmsg);
-                     });
+  if (!eat)
+    return false;
+
+  size_t payload_size = 0;
+  for (const auto& msg : messages)
+    payload_size += msg.size();
+  std::string payload;
+  payload.reserve(payload_size);
+  for (const auto& msg : messages)
+    payload += msg;
+  std::wstring wide_payload = u8tow(payload);
+  return eat(wide_payload);
 }
 
 static inline COLORREF blend_colors(COLORREF fcolor, COLORREF bcolor) {
@@ -954,6 +1067,14 @@ static Bool _RimeGetColor(RimeConfig* config,
                           int& value,
                           const ColorFormat& fmt,
                           const unsigned int& fallback) {
+  static const std::regex hex_regex(
+#ifdef USE_SHARP_COLOR_CODE
+      "^(0x|#)[0-9a-f]+$", std::regex::icase);
+  static const std::regex trim_head_regex("0x|#", std::regex::icase);
+#else
+      "^0x[0-9a-f]+$", std::regex::icase);
+  static const std::regex trim_head_regex("0x", std::regex::icase);
+#endif
   RimeApi* rime_api = rime_get_api();
   char color[256] = {0};
   if (!rime_api->config_get_string(config, key.c_str(), color, 256)) {
@@ -973,8 +1094,8 @@ static Bool _RimeGetColor(RimeConfig* config,
     else
       return RGBA2ABGR(color) & 0xffffffff;
   };
-  if (std::regex_match(color_str, HEX_REGEX)) {
-    auto tmp = std::regex_replace(color_str, TRIMHEAD_REGEX, "").substr(0, 8);
+  if (std::regex_match(color_str, hex_regex)) {
+    auto tmp = std::regex_replace(color_str, trim_head_regex, "").substr(0, 8);
     switch (tmp.length()) {
       case 6:  // color code without alpha, xxyyzz add alpha ff
         value = std::stoul(tmp, 0, 16);
@@ -1102,8 +1223,9 @@ void RimeWithWeaselHandler::_UpdateShowNotifications(RimeConfig* config,
 // update ui's style parameters, ui has been check before referenced
 static void _UpdateUIStyle(RimeConfig* config, UI* ui, bool initialize) {
   UIStyle& style(ui->style());
+  static const std::wregex space_trim_regex(L"\\s*(,|:|^|$)\\s*");
   const std::function<void(std::wstring&)> rmspace = [](std::wstring& str) {
-    str = std::regex_replace(str, std::wregex(L"\\s*(,|:|^|$)\\s*"), L"$1");
+    str = std::regex_replace(str, space_trim_regex, L"$1");
   };
   const std::function<void(int&)> _abs = [](int& value) { value = abs(value); };
   // get font faces

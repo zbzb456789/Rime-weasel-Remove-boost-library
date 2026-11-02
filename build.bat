@@ -126,10 +126,10 @@ if %build_rime% == 0 (
   set build_weasel=1
 )))))
 
-rem quit WeaselServer.exe before building
+rem quit RimeUIServer.exe before building
 cd /d %WEASEL_ROOT%
-if exist output\weaselserver.exe (
-  output\weaselserver.exe /q
+if exist output\rimeuiserver.exe (
+  output\rimeuiserver.exe /q
 )
 
 rem build booost
@@ -218,9 +218,9 @@ if %build_arm64% == 1 (
   if errorlevel 1 goto error
   popd
 
-  copy arm64x_wrapper\weaselARM64X.dll output
+  copy arm64x_wrapper\rimeuiARM64X.dll output
   if errorlevel 1 goto error
-  copy arm64x_wrapper\weaselARM64X.ime output
+  copy arm64x_wrapper\rimeuiARM64X.ime output
   if errorlevel 1 goto error
 )
 

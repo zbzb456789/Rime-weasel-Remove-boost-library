@@ -4,7 +4,9 @@
 #include <vector>
 #include <regex>
 #include <iterator>
-#include <d2d1.h>
+#include <map>
+#include <d2d1_1.h>
+#include <d2d1effects.h>
 #include <dwrite_2.h>
 #include <memory>
 #include <functional>
@@ -22,6 +24,16 @@ template <class T>
 using an = std::shared_ptr<T>;
 
 using PDWR = an<DirectWriteResources>;
+
+struct ShadowShape {
+  D2D1_RECT_F rect;
+  float radius;
+  bool roundTopLeft;
+  bool roundTopRight;
+  bool roundBottomRight;
+  bool roundBottomLeft;
+};
+
 //
 // 输入法界面接口类
 //
@@ -115,11 +127,86 @@ class DirectWriteResources {
         reinterpret_cast<IDWriteTextLayout**>(
             pTextLayout.ReleaseAndGetAddressOf()));
   }
+  HRESULT CreateTextLayoutCached(std::wstring_view text,
+                                 const int& nCount,
+                                 IDWriteTextFormat1* const txtFormat,
+                                 const float& width,
+                                 const float& height,
+                                 bool verticalText,
+                                 bool leftToRight);
+  bool GetCachedTextExtent(std::wstring_view text,
+                           IDWriteTextFormat1* const txtFormat,
+                           float width,
+                           float height,
+                           bool verticalText,
+                           bool leftToRight,
+                           SIZE* size) const;
+  void CacheTextExtent(std::wstring_view text,
+                       IDWriteTextFormat1* const txtFormat,
+                       float width,
+                       float height,
+                       bool verticalText,
+                       bool leftToRight,
+                       const SIZE& size);
   void DrawRect(D2D1_RECT_F* const rect,
                 const float& strokeWidth = 1.0f,
                 ID2D1StrokeStyle* const sstyle = (ID2D1StrokeStyle*)0) {
     pRenderTarget->DrawRectangle(rect, pBrush.Get(), strokeWidth, sstyle);
   }
+  ComPtr<ID2D1PathGeometry> CreateRoundRectGeometry(
+      const D2D1_RECT_F& rect,
+      float radiusX,
+      float radiusY,
+      bool roundTopLeft = true,
+      bool roundTopRight = true,
+      bool roundBottomRight = true,
+      bool roundBottomLeft = true);
+  ComPtr<ID2D1PathGeometry> CreateRoundRectGeometryBatch(
+      const std::vector<ShadowShape>& shapes);
+  void FillRoundRect(const D2D1_RECT_F& rect,
+                     const D2D1_COLOR_F& color,
+                     float radiusX,
+                     float radiusY,
+                     bool roundTopLeft = true,
+                     bool roundTopRight = true,
+                     bool roundBottomRight = true,
+                     bool roundBottomLeft = true);
+  void DrawRoundRect(const D2D1_RECT_F& rect,
+                     const D2D1_COLOR_F& color,
+                     float strokeWidth,
+                     float radiusX,
+                     float radiusY,
+                     bool roundTopLeft = true,
+                     bool roundTopRight = true,
+                     bool roundBottomRight = true,
+                     bool roundBottomLeft = true);
+  void DrawSoftShadow(const D2D1_RECT_F& rect,
+                      float radius,
+                      const D2D1_COLOR_F& color,
+                      float blurRadius,
+                      float offsetX,
+                      float offsetY,
+                      float blurMarginX = 0.0f,
+                      float blurMarginY = 0.0f,
+                      bool roundTopLeft = true,
+                      bool roundTopRight = true,
+                      bool roundBottomRight = true,
+                      bool roundBottomLeft = true);
+  void DrawSoftShadowBatch(const std::vector<ShadowShape>& shapes,
+                           const D2D1_COLOR_F& color,
+                           float blurRadius,
+                           float offsetX,
+                           float offsetY,
+                           float blurMarginX,
+                           float blurMarginY);
+  void FillRoundRectBatch(const std::vector<ShadowShape>& shapes,
+                          const D2D1_COLOR_F& color);
+  void DrawRoundRectBatch(const std::vector<ShadowShape>& shapes,
+                          const D2D1_COLOR_F& color,
+                          float strokeWidth);
+  HRESULT SetRenderTarget(ID2D1RenderTarget* renderTarget);
+  void SetD2DFactory(ID2D1Factory* factory) { pD2d1Factory = factory; }
+  void ClearRenderTarget();
   HRESULT GetLayoutOverhangMetrics(DWRITE_OVERHANG_METRICS* overhangMetrics) {
     return pTextLayout->GetOverhangMetrics(overhangMetrics);
   }
@@ -147,16 +234,78 @@ class DirectWriteResources {
   float dpiScaleFontPoint, dpiScaleLayout;
   ComPtr<ID2D1Factory> pD2d1Factory;
   ComPtr<IDWriteFactory2> pDWFactory;
-  ComPtr<ID2D1DCRenderTarget> pRenderTarget;
+  ComPtr<ID2D1RenderTarget> pRenderTarget;
+  ComPtr<ID2D1Device> pCachedDevice;
   ComPtr<IDWriteTextFormat1> pPreeditTextFormat;
   ComPtr<IDWriteTextFormat1> pTextFormat;
   ComPtr<IDWriteTextFormat1> pLabelTextFormat;
   ComPtr<IDWriteTextFormat1> pCommentTextFormat;
   ComPtr<IDWriteTextLayout2> pTextLayout;
   ComPtr<ID2D1SolidColorBrush> pBrush;
+  ComPtr<ID2D1Effect> pShadowBlurEffect;
+  ComPtr<ID2D1Bitmap1> pShadowBitmap;
+  UINT shadowBitmapWidth = 0;
+  UINT shadowBitmapHeight = 0;
 
  private:
+  struct TextLayoutKey {
+    std::wstring text;
+    IDWriteTextFormat1* format = nullptr;
+    float width = 0.0f;
+    float height = 0.0f;
+    bool verticalText = false;
+    bool leftToRight = false;
+
+    bool operator<(const TextLayoutKey& other) const {
+      if (text != other.text)
+        return text < other.text;
+      if (format != other.format)
+        return format < other.format;
+      if (width != other.width)
+        return width < other.width;
+      if (height != other.height)
+        return height < other.height;
+      if (verticalText != other.verticalText)
+        return verticalText < other.verticalText;
+      return leftToRight < other.leftToRight;
+    }
+  };
+
+  struct TextExtentKey {
+    std::wstring text;
+    IDWriteTextFormat1* format = nullptr;
+    float width = 0.0f;
+    float height = 0.0f;
+    bool verticalText = false;
+    bool leftToRight = false;
+
+    bool operator<(const TextExtentKey& other) const {
+      if (text != other.text)
+        return text < other.text;
+      if (format != other.format)
+        return format < other.format;
+      if (width != other.width)
+        return width < other.width;
+      if (height != other.height)
+        return height < other.height;
+      if (verticalText != other.verticalText)
+        return verticalText < other.verticalText;
+      return leftToRight < other.leftToRight;
+    }
+  };
+
+  std::map<TextLayoutKey, ComPtr<IDWriteTextLayout2>> textLayoutCache_;
+  std::map<TextExtentKey, SIZE> textExtentCache_;
   UIStyle& _style;
+  D2D1_TEXT_ANTIALIAS_MODE textAntialiasMode_;
+  void _AppendRoundRectPath(ID2D1GeometrySink* sink,
+                            const D2D1_RECT_F& rect,
+                            float radiusX,
+                            float radiusY,
+                            bool roundTopLeft,
+                            bool roundTopRight,
+                            bool roundBottomRight,
+                            bool roundBottomLeft);
   void _ParseFontFace(const std::wstring& fontFaceStr,
                       DWRITE_FONT_WEIGHT& fontWeight,
                       DWRITE_FONT_STYLE& fontStyle);

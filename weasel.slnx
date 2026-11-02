@@ -1,0 +1,64 @@
+<Solution>
+  <Configurations>
+    <Platform Name="ARM" />
+    <Platform Name="ARM64" />
+    <Platform Name="Win32" />
+    <Platform Name="x64" />
+  </Configurations>
+  <Folder Name="/Solution Items/">
+    <File Path="include/PipeChannel.h" />
+    <File Path="include/PyWeasel.h" />
+    <File Path="include/resource.h" />
+    <File Path="include/ResponseParser.h" />
+    <File Path="include/RimeWithWeasel.h" />
+    <File Path="include/StringAlgorithm.hpp" />
+    <File Path="include/VersionHelpers.hpp" />
+    <File Path="include/WeaselConstants.h" />
+    <File Path="include/WeaselIPC.h" />
+    <File Path="include/WeaselIPCData.h" />
+    <File Path="include/WeaselUI.h" />
+    <File Path="include/WeaselUtility.h" />
+    <File Path="include/winapifamily.h" />
+    <File Path="include/winpackagefamily.h" />
+  </Folder>
+  <Project Path="RimeWithWeasel/RimeWithWeasel.vcxproj" Id="1c497821-bd63-4f02-9094-32b185b62f23">
+    <Build Solution="*|ARM" Project="false" />
+    <Build Solution="*|ARM64" Project="false" />
+  </Project>
+  <Project Path="test/TestResponseParser/TestResponseParser.vcxproj" Id="cc642427-64d7-44d9-8543-8cbbf981fae7">
+    <Build Solution="*|ARM" Project="false" />
+    <Build Solution="*|ARM64" Project="false" />
+    <Build Solution="Release|Win32" Project="false" />
+    <Build Solution="Release|x64" Project="false" />
+  </Project>
+  <Project Path="test/TestWeaselIPC/TestWeaselIPC.vcxproj" Id="9c1cc4ba-18ff-4890-908e-e545881c5586">
+    <Build Solution="*|ARM" Project="false" />
+    <Build Solution="*|ARM64" Project="false" />
+    <Build Solution="Release|Win32" Project="false" />
+    <Build Solution="Release|x64" Project="false" />
+  </Project>
+  <Project Path="WeaselDeployer/WeaselDeployer.vcxproj" Id="f53f3e9c-cc4d-4d1d-9c2e-719fe60a7e6b">
+    <Platform Solution="*|ARM" Project="Win32" />
+    <Platform Solution="*|ARM64" Project="Win32" />
+    <Build Solution="*|ARM" Project="false" />
+    <Build Solution="*|ARM64" Project="false" />
+  </Project>
+  <Project Path="WeaselIME/WeaselIME.vcxproj" Id="a958fe3d-9f6e-44cb-981e-f2ae181657b3" />
+  <Project Path="WeaselIPC/WeaselIPC.vcxproj" Id="ce11a2df-8d20-4b07-a935-4b0d03f0303d" />
+  <Project Path="WeaselIPCServer/WeaselIPCServer.vcxproj" Id="26930622-cfa2-43df-a9f3-4aa4a313b2a4">
+    <Build Solution="*|ARM" Project="false" />
+    <Build Solution="*|ARM64" Project="false" />
+  </Project>
+  <Project Path="WeaselServer/WeaselServer.vcxproj" Id="a68c2a5c-d74d-4cb2-9e22-a4d2fc256a2d">
+    <Build Solution="*|ARM" Project="false" />
+    <Build Solution="*|ARM64" Project="false" />
+  </Project>
+  <Project Path="WeaselSetup/WeaselSetup.vcxproj" Id="39f6e3f5-8f0b-4023-bc40-a66ae6c37095">
+    <Platform Project="Win32" />
+    <Build Solution="*|ARM" Project="false" />
+    <Build Solution="*|ARM64" Project="false" />
+    <Build Solution="*|x64" Project="false" />
+  </Project>
+  <Project Path="WeaselTSF/WeaselTSF.vcxproj" Id="ff9b3625-bbd6-4972-8f23-7ba57f3127e8" />
+  <Project Path="WeaselUI/WeaselUI.vcxproj" Id="10b3b8bf-7294-4661-9a8a-2ffc920fa2f4" />
+</Solution>

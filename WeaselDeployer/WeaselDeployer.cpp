@@ -40,7 +40,7 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,
   CreateDirectory(WeaselUserDataPath().c_str(), nullptr);
 
   int ret = 0;
-  HANDLE hMutex = CreateMutex(nullptr, TRUE, L"WeaselDeployerExclusiveMutex");
+  HANDLE hMutex = CreateMutex(nullptr, TRUE, L"RimeUIDeployerExclusiveMutex");
   if (!hMutex) {
     ret = 1;
   } else if (GetLastError() == ERROR_ALREADY_EXISTS) {
@@ -69,7 +69,7 @@ static int Run(LPTSTR lpCmdLine) {
       MessageBox(nullptr, msg, L"Weasel Deployer", MB_ICONINFORMATION | MB_OK);
     } else {
       MessageBox(nullptr,
-                 L"Usage: WeaselDeployer.exe [options]\n"
+                 L"Usage: RimeUIDeployer.exe [options]\n"
                  L"/? or /help		- Show this help message\n"
                  L"/deploy		- Update Workspace\n"
                  L"/dict		- Manage dictionary\n"

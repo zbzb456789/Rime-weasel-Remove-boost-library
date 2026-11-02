@@ -17,29 +17,29 @@ if not %errorlevel% == 0 (
 )
 
 :unregister
-echo uninstalling Weasel ime.
+echo uninstalling rimeui ime.
 
 cscript check_windows_version.js
 if errorlevel 2 goto win7_x64_uninstall
 if errorlevel 1 goto xp_uninstall
 
 :win7_uninstall
-WeaselSetup.exe /u
-rem regsvr32.exe /s /u "%CD%\weasel.dll"
+RimeUISetup.exe /u
+rem regsvr32.exe /s /u "%CD%\rimeui.dll"
 goto next
 
 :win7_x64_uninstall
 WeaselSetupx64.exe /u
-rem regsvr32.exe /s /u "%CD%\weasel.dll"
-rem regsvr32.exe /s /u "%CD%\weaselx64.dll"
+rem regsvr32.exe /s /u "%CD%\rimeui.dll"
+rem regsvr32.exe /s /u "%CD%\rimeuix64.dll"
 goto next
 
 :xp_uninstall
-WeaselSetup.exe /u
+RimeUISetup.exe /u
 goto next
 
 :next
-reg delete "HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Run" /v WeaselServer /f
+reg delete "HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Run" /v RimeUIServer /f
 
 :done
 if /i "%1" == "/unregister" pause

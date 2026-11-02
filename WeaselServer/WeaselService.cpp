@@ -3,7 +3,7 @@
 #include "WeaselServerApp.h"
 #include <thread>
 
-wchar_t WEASEL_SERVICE_NAME[] = L"WeaselInputService";
+wchar_t WEASEL_SERVICE_NAME[] = L"RimeUIInputService";
 
 WeaselService* WeaselService::_service = NULL;
 

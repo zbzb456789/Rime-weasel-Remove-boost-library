@@ -5,13 +5,13 @@ rem Do not update packages; only download missing files.
 rem CAUTION: may suffer from incomplete downloads.
 rem set no_update=1
 
-rem Rime configuration manager and downloaded packages
+rem RimeUI configuration manager and downloaded packages
 set plum_dir=%APPDATA%\plum
 
-rem Location of Rime user directory
-rem set rime_dir=%APPDATA%\Rime
+rem Location of RimeUI user directory
+rem set rime_dir=%APPDATA%\RimeUI
 
-set key=HKEY_CURRENT_USER\SOFTWARE\Rime\Weasel
+set key=HKEY_CURRENT_USER\SOFTWARE\RimeUI
 set name=RimeUserDir
 for /f "tokens=2*" %%a in ('reg query "%key%" /v "%name%"') do set rime_dir=%%b
 

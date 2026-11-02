@@ -14,6 +14,11 @@ using namespace std;
       throw err;                         \
   }
 
+namespace {
+constexpr DWORD kClientPipeTimeoutMs = 3000;
+constexpr int kClientConnectRetries = 10;
+}  // namespace
+
 PipeChannelBase::PipeChannelBase(std::wstring pn_cmd,
                                  size_t bs = 4 * 1024,
                                  SECURITY_ATTRIBUTES* s = NULL)
@@ -52,14 +57,25 @@ bool PipeChannelBase::_Ensure() {
 }
 
 HANDLE PipeChannelBase::_Connect(const wchar_t* name) {
-  HANDLE pipe = INVALID_HANDLE_VALUE;
-  while (_Invalid(pipe = _TryConnect()))
+  for (int i = 0; i < kClientConnectRetries; ++i) {
+    HANDLE pipe = INVALID_HANDLE_VALUE;
+    try {
+      pipe = _TryConnect();
+      if (!_Invalid(pipe)) {
+        DWORD mode = PIPE_READMODE_MESSAGE;
+        if (!SetNamedPipeHandleState(pipe, &mode, NULL, NULL)) {
+          _ThrowLastError;
+        }
+        return pipe;
+      }
+    } catch (DWORD err) {
+      if (err != ERROR_PIPE_BUSY)
+        throw;
+    }
     ::WaitNamedPipe(name, 500);
-  DWORD mode = PIPE_READMODE_MESSAGE;
-  if (!SetNamedPipeHandleState(pipe, &mode, NULL, NULL)) {
-    _ThrowLastError;
   }
-  return pipe;
+  ::SetLastError(ERROR_SEM_TIMEOUT);
+  throw ERROR_SEM_TIMEOUT;
 }
 
 void PipeChannelBase::_Reconnect() {
@@ -99,11 +115,25 @@ void PipeChannelBase::_FinalizePipe(HANDLE& p) {
 
 void PipeChannelBase::_Receive(HANDLE pipe, LPVOID msg, size_t rec_len) {
   DWORD lread;
+  if (!is_server_) {
+    const DWORD wait = ::WaitForSingleObject(pipe, kClientPipeTimeoutMs);
+    if (wait != WAIT_OBJECT_0) {
+      ::SetLastError(ERROR_SEM_TIMEOUT);
+      _ThrowLastError;
+    }
+  }
   BOOL success = ::ReadFile(pipe, msg, rec_len, &lread, NULL);
   if (!success) {
     _ThrowIfNot(ERROR_MORE_DATA);
 
     memset(buffer.get(), 0, buff_size);
+    if (!is_server_) {
+      const DWORD wait = ::WaitForSingleObject(pipe, kClientPipeTimeoutMs);
+      if (wait != WAIT_OBJECT_0) {
+        ::SetLastError(ERROR_SEM_TIMEOUT);
+        _ThrowLastError;
+      }
+    }
     success = ::ReadFile(pipe, buffer.get(), buff_size, &lread, NULL);
     if (!success) {
       _ThrowLastError;
@@ -120,5 +150,6 @@ HANDLE PipeChannelBase::_ConnectServerPipe(std::wstring& pn) {
   if (pipe == INVALID_HANDLE_VALUE || !::ConnectNamedPipe(pipe, NULL)) {
     _ThrowLastError;
   }
+  is_server_ = true;
   return pipe;
 }

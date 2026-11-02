@@ -17,7 +17,8 @@ class ClientImpl {
   void StartMaintenance();
   void EndMaintenance();
   bool Echo();
-  bool ProcessKeyEvent(KeyEvent const& keyEvent);
+  bool ProcessKeyEvent(KeyEvent const& keyEvent,
+                       bool* session_invalid = nullptr);
   bool CommitComposition();
   bool ClearComposition();
   bool SelectCandidateOnCurrentPage(size_t index);

@@ -18,13 +18,12 @@ target("WeaselIME")
     os.cp(path.join(target:targetdir(), "*.ime"), "$(projectdir)/output")
   end)
   if is_arch("x86") then
-    fname = "weasel.ime"
+    fname = "rimeui.ime"
   elseif is_arch("x64") then
-    fname = "weaselx64.ime"
+    fname = "rimeuix64.ime"
   elseif is_arch("arm") then
-    fname = "weaselARM.ime"
+    fname = "rimeuiARM.ime"
   elseif is_arch("arm64") then
-    fname = "weaselARM64.ime"
+    fname = "rimeuiARM64.ime"
   end
   set_filename(fname)
-

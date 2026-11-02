@@ -7,7 +7,9 @@ STDAPI WeaselTSF::DoEditSession(TfEditCookie ec) {
   // get commit string from server
   std::wstring commit;
   weasel::Config config;
-  auto context = std::make_shared<weasel::Context>();
+  if (!_context)
+    _context = std::make_shared<weasel::Context>();
+  auto context = _context;
   weasel::ResponseParser parser(&commit, context.get(), &_status, &config,
                                 &_cand->style());
 

@@ -60,11 +60,11 @@ static int CustomInstall(bool installing) {
   bool old_ime_support = false;
   std::wstring user_dir;
 
-  const WCHAR KEY[] = L"Software\\Rime\\Weasel";
+  const WCHAR KEY[] = L"Software\\RimeUI";
   HKEY hKey;
   LSTATUS ret = RegOpenKey(HKEY_CURRENT_USER, KEY, &hKey);
   if (ret == ERROR_SUCCESS) {
-    WCHAR value[MAX_PATH];
+    WCHAR value[MAX_PATH]{};
     DWORD len = sizeof(value);
     DWORD type = 0;
     DWORD data = 0;
@@ -103,9 +103,9 @@ static int CustomInstall(bool installing) {
       return 1;
 
   if (user_dir.empty()) {
-    // default user dir %APPDATA%\Rime
+    // default user dir %APPDATA%\RimeUI
     WCHAR _path[MAX_PATH] = {0};
-    ExpandEnvironmentStringsW(L"%APPDATA%\\Rime", _path, _countof(_path));
+    ExpandEnvironmentStringsW(L"%APPDATA%\\RimeUI", _path, _countof(_path));
     user_dir = std::wstring(_path);
   }
   ret = SetRegKeyValue(HKEY_CURRENT_USER, KEY, L"RimeUserDir", user_dir.c_str(),
@@ -125,13 +125,13 @@ static int CustomInstall(bool installing) {
   if (_has_installed) {
     std::wstring dir(install_dir());
     std::jthread th([dir]() {
-      ShellExecuteW(nullptr, nullptr, (dir + L"\\WeaselServer.exe").c_str(), L"/q",
+      ShellExecuteW(nullptr, nullptr, (dir + L"\\RimeUIServer.exe").c_str(), L"/q",
                     nullptr, SW_SHOWNORMAL);
       Sleep(500);
-      ShellExecuteW(nullptr, nullptr, (dir + L"\\WeaselServer.exe").c_str(), L"",
+      ShellExecuteW(nullptr, nullptr, (dir + L"\\RimeUIServer.exe").c_str(), L"",
                     nullptr, SW_SHOWNORMAL);
       Sleep(500);
-      ShellExecuteW(nullptr, nullptr, (dir + L"\\WeaselDeployer.exe").c_str(),
+      ShellExecuteW(nullptr, nullptr, (dir + L"\\RimeUIDeployer.exe").c_str(),
                     L"/deploy", nullptr, SW_SHOWNORMAL);
     });
     th.detach();
@@ -189,44 +189,44 @@ static int Run(LPTSTR lpCmdLine) {
   }
 
   if (auto res = GetParamByPrefix(lpCmdLine, L"/userdir:")) {
-    return SetRegKeyValue(HKEY_CURRENT_USER, L"Software\\Rime\\weasel",
+    return SetRegKeyValue(HKEY_CURRENT_USER, L"Software\\RimeUI",
                           L"RimeUserDir", res, REG_SZ);
   }
 
   if (!wcscmp(L"/ls", lpCmdLine)) {
-    return SetRegKeyValue(HKEY_CURRENT_USER, L"Software\\Rime\\weasel",
+    return SetRegKeyValue(HKEY_CURRENT_USER, L"Software\\RimeUI",
                           L"Language", L"chs", REG_SZ);
   } else if (!wcscmp(L"/lt", lpCmdLine)) {
-    return SetRegKeyValue(HKEY_CURRENT_USER, L"Software\\Rime\\weasel",
+    return SetRegKeyValue(HKEY_CURRENT_USER, L"Software\\RimeUI",
                           L"Language", L"cht", REG_SZ);
   } else if (!wcscmp(L"/le", lpCmdLine)) {
-    return SetRegKeyValue(HKEY_CURRENT_USER, L"Software\\Rime\\weasel",
+    return SetRegKeyValue(HKEY_CURRENT_USER, L"Software\\RimeUI",
                           L"Language", L"eng", REG_SZ);
   }
 
   if (!wcscmp(L"/eu", lpCmdLine)) {
-    return SetRegKeyValue(HKEY_CURRENT_USER, L"Software\\Rime\\weasel\\Updates",
+    return SetRegKeyValue(HKEY_CURRENT_USER, L"Software\\RimeUI\\Updates",
                           L"CheckForUpdates", L"1", REG_SZ);
   }
   if (!wcscmp(L"/du", lpCmdLine)) {
-    return SetRegKeyValue(HKEY_CURRENT_USER, L"Software\\Rime\\weasel\\Updates",
+    return SetRegKeyValue(HKEY_CURRENT_USER, L"Software\\RimeUI\\Updates",
                           L"CheckForUpdates", L"0", REG_SZ);
   }
 
   if (!wcscmp(L"/toggleime", lpCmdLine)) {
-    return SetRegKeyValue(HKEY_CURRENT_USER, L"Software\\Rime\\weasel",
+    return SetRegKeyValue(HKEY_CURRENT_USER, L"Software\\RimeUI",
                           L"ToggleImeOnOpenClose", L"yes", REG_SZ);
   }
   if (!wcscmp(L"/toggleascii", lpCmdLine)) {
-    return SetRegKeyValue(HKEY_CURRENT_USER, L"Software\\Rime\\weasel",
+    return SetRegKeyValue(HKEY_CURRENT_USER, L"Software\\RimeUI",
                           L"ToggleImeOnOpenClose", L"no", REG_SZ);
   }
   if (!wcscmp(L"/testing", lpCmdLine)) {
-    return SetRegKeyValue(HKEY_CURRENT_USER, L"Software\\Rime\\weasel",
+    return SetRegKeyValue(HKEY_CURRENT_USER, L"Software\\RimeUI",
                           L"UpdateChannel", L"testing", REG_SZ);
   }
   if (!wcscmp(L"/release", lpCmdLine)) {
-    return SetRegKeyValue(HKEY_CURRENT_USER, L"Software\\Rime\\weasel",
+    return SetRegKeyValue(HKEY_CURRENT_USER, L"Software\\RimeUI",
                           L"UpdateChannel", L"release", REG_SZ);
   }
 

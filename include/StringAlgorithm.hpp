@@ -39,6 +39,14 @@ inline std::string join(const std::set<std::string>& list, const std::string& de
 	});
 }
 
+inline std::string join(const std::vector<std::string>& list, const std::string& delim)
+{
+	return std::accumulate(list.begin(), list.end(), std::string(), [&delim](const std::string& str1, const std::string& str2)
+	{
+		return str1.empty() ? str2 : str1 + delim + str2;
+	});
+}
+
 inline std::vector<std::wstring>& split(std::vector<std::wstring>& result, std::wstring_view input, const wchar_t* delim)
 {
 	result.clear();

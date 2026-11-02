@@ -154,7 +154,7 @@ DWORD ServerImpl::OnCommand(WEASEL_IPC_COMMAND uMsg,
 }
 
 int ServerImpl::Start() {
-  std::wstring instanceName = L"(WEASEL)Furandōru-Sukāretto-";
+  std::wstring instanceName = L"(RIMEUI)Furandōru-Sukāretto-";
   instanceName += getUsername();
   HANDLE hMutexOneInstance = ::CreateMutex(NULL, FALSE, instanceName.c_str());
   bool areYouOK = (::GetLastError() == ERROR_ALREADY_EXISTS ||
@@ -230,6 +230,9 @@ DWORD ServerImpl::OnKeyEvent(WEASEL_IPC_COMMAND uMsg,
                              DWORD lParam) {
   if (!m_pRequestHandler /* || !m_pSharedMemory*/)
     return 0;
+
+  if (!m_pRequestHandler->FindSession(lParam))
+    return WEASEL_IPC_SESSION_INVALID;
 
   auto eat = [this](std::wstring& msg) -> bool {
     *channel << msg;

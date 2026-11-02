@@ -16,7 +16,8 @@ void weasel::StandardLayout::GetTextSizeDW(
     size_t nCount,
     ComPtr<IDWriteTextFormat1>& pTextFormat,
     PDWR pDWR,
-    LPSIZE lpSize) const {
+    LPSIZE lpSize,
+    bool force_horizontal) const {
   D2D1_SIZE_F sz;
   HRESULT hr = S_OK;
 
@@ -25,21 +26,26 @@ void weasel::StandardLayout::GetTextSizeDW(
     lpSize->cy = 0;
     return;
   }
-  // 创建文本布局
-  if (_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT)
-    HR(pDWR->CreateTextLayout(text, (int)nCount, pTextFormat.Get(),
-                              0.0f, (float)_style.max_height));
-  else
-    HR(pDWR->CreateTextLayout(text, (int)nCount, pTextFormat.Get(),
-                              (float)_style.max_width, 0.0f));
+  const bool vertical_text =
+      !force_horizontal && _style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT;
+  const bool left_to_right =
+      vertical_text ? _style.vertical_text_left_to_right : false;
+  const float first_width = vertical_text ? 0.0f : (float)_style.max_width;
+  const float first_height = vertical_text ? (float)_style.max_height : 0.0f;
+  const std::wstring_view key_text = text.substr(0, nCount);
 
-  if (_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT) {
-    DWRITE_FLOW_DIRECTION flow = _style.vertical_text_left_to_right
-                                     ? DWRITE_FLOW_DIRECTION_LEFT_TO_RIGHT
-                                     : DWRITE_FLOW_DIRECTION_RIGHT_TO_LEFT;
-    HR(pDWR->SetLayoutReadingDirection(DWRITE_READING_DIRECTION_TOP_TO_BOTTOM));
-    HR(pDWR->SetLayoutFlowDirection(flow));
+  SIZE cached_size = {};
+  if (pDWR->GetCachedTextExtent(key_text, pTextFormat.Get(), first_width,
+                                first_height, vertical_text, left_to_right,
+                                &cached_size)) {
+    *lpSize = cached_size;
+    return;
   }
+
+  // 创建文本布局
+  HR(pDWR->CreateTextLayoutCached(key_text, (int)nCount, pTextFormat.Get(),
+                                  first_width, first_height, vertical_text,
+                                  left_to_right));
   // 获取文本尺寸
   DWRITE_TEXT_METRICS textMetrics;
   HR(pDWR->GetLayoutMetrics(&textMetrics));
@@ -49,23 +55,20 @@ void weasel::StandardLayout::GetTextSizeDW(
   lpSize->cx = (int)sz.width;
   lpSize->cy = (int)sz.height;
 
-  if (_style.layout_type != UIStyle::LAYOUT_VERTICAL_TEXT) {
+  if (!vertical_text) {
     float max_width = _style.max_width == 0
                          ? textMetrics.widthIncludingTrailingWhitespace
                          : (float)_style.max_width;
-    HR(pDWR->CreateTextLayout(text, (int)nCount, pTextFormat.Get(),
-                              max_width, textMetrics.height));
+    HR(pDWR->CreateTextLayoutCached(key_text, (int)nCount, pTextFormat.Get(),
+                                    max_width, textMetrics.height,
+                                    vertical_text, false));
   } else {
     float max_height =
         _style.max_height == 0 ? textMetrics.height : (float)_style.max_height;
-    HR(pDWR->CreateTextLayout(text, (int)nCount, pTextFormat.Get(),
-                              textMetrics.widthIncludingTrailingWhitespace,
-                              max_height));
-  }
-
-  if (_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT) {
-    HR(pDWR->SetLayoutReadingDirection(DWRITE_READING_DIRECTION_TOP_TO_BOTTOM));
-    HR(pDWR->SetLayoutFlowDirection(DWRITE_FLOW_DIRECTION_RIGHT_TO_LEFT));
+    HR(pDWR->CreateTextLayoutCached(
+        key_text, (int)nCount, pTextFormat.Get(),
+        textMetrics.widthIncludingTrailingWhitespace, max_height, vertical_text,
+        false));
   }
   DWRITE_OVERHANG_METRICS overhangMetrics;
   HR(pDWR->GetLayoutOverhangMetrics(&overhangMetrics));
@@ -79,12 +82,15 @@ void weasel::StandardLayout::GetTextSizeDW(
     if (overhangMetrics.bottom > 0)
       lpSize->cy += (LONG)(overhangMetrics.bottom + 1);
   }
+  pDWR->CacheTextExtent(key_text, pTextFormat.Get(), first_width, first_height,
+                        vertical_text, left_to_right, *lpSize);
 }
 
 CSize StandardLayout::GetPreeditSize(CDCHandle dc,
                                      const weasel::Text& text,
                                      ComPtr<IDWriteTextFormat1> pTextFormat,
-                                     PDWR pDWR) {
+                                     PDWR pDWR,
+                                     bool force_horizontal) {
   const std::wstring& preedit = text.str;
   const std::vector<weasel::TextAttribute>& attrs = text.attributes;
   CSize size(0, 0);
@@ -98,13 +104,14 @@ CSize StandardLayout::GetPreeditSize(CDCHandle dc,
       std::wstring_view hilited_str = std::wstring_view(preedit).substr(_range.start, _range.end - _range.start);
       std::wstring_view after_str = std::wstring_view(preedit).substr(_range.end);
       GetTextSizeDW(before_str, before_str.length(), pTextFormat, pDWR,
-                    &_beforesz);
+                    &_beforesz, force_horizontal);
       GetTextSizeDW(hilited_str, hilited_str.length(), pTextFormat, pDWR,
-                    &_hilitedsz);
+                    &_hilitedsz, force_horizontal);
       GetTextSizeDW(after_str, after_str.length(), pTextFormat, pDWR,
-                    &_aftersz);
+                    &_aftersz, force_horizontal);
       auto width_max = 0, height_max = 0;
-      if (_style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT) {
+      if (!force_horizontal &&
+          _style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT) {
         width_max = max(width_max, _beforesz.cx);
         width_max = max(width_max, _hilitedsz.cx);
         width_max = max(width_max, _aftersz.cx);
@@ -124,7 +131,8 @@ CSize StandardLayout::GetPreeditSize(CDCHandle dc,
       size.cx = width_max;
       size.cy = height_max;
     } else
-      GetTextSizeDW(preedit, preedit.length(), pTextFormat, pDWR, &size);
+      GetTextSizeDW(preedit, preedit.length(), pTextFormat, pDWR, &size,
+                    force_horizontal);
   }
   return size;
 }
@@ -132,23 +140,27 @@ CSize StandardLayout::GetPreeditSize(CDCHandle dc,
 // check if a candidate back path over _bgRect path
 bool weasel::StandardLayout::_IsHighlightOverCandidateWindow(CRect& rc,
                                                              CDCHandle& dc) {
-  GraphicsRoundRectPath bgPath(_bgRect, _style.round_corner_ex);
-  GraphicsRoundRectPath hlPath(rc, _style.round_corner);
-
-  Gdiplus::Region bgRegion(&bgPath);
-  Gdiplus::Region hlRegion(&hlPath);
-  Gdiplus::Region* tmpRegion = hlRegion.Clone();
-
-  if (!tmpRegion)
+  if (rc.IsRectEmpty() || _bgRect.IsRectEmpty())
     return false;
-  tmpRegion->Xor(&bgRegion);
-  tmpRegion->Exclude(&bgRegion);
 
-  Gdiplus::Graphics g(dc);
-  bool res = !tmpRegion->IsEmpty(&g);
-  delete tmpRegion;
-  tmpRegion = NULL;
-  return res;
+  const int bgRadiusX =
+      (std::max)(0, (std::min)(_style.round_corner_ex, _bgRect.Width() / 2));
+  const int bgRadiusY =
+      (std::max)(0, (std::min)(_style.round_corner_ex, _bgRect.Height() / 2));
+  const int hlRadiusX =
+      (std::max)(0, (std::min)(_style.round_corner, rc.Width() / 2));
+  const int hlRadiusY =
+      (std::max)(0, (std::min)(_style.round_corner, rc.Height() / 2));
+
+  // A rounded rectangle is fully inside another rounded rectangle when its
+  // bounding rectangle is inset by the difference of their corner radii.
+  const int insetX = bgRadiusX - hlRadiusX;
+  const int insetY = bgRadiusY - hlRadiusY;
+  const bool inside = rc.left >= _bgRect.left + insetX &&
+                      rc.top >= _bgRect.top + insetY &&
+                      rc.right <= _bgRect.right - insetX &&
+                      rc.bottom <= _bgRect.bottom - insetY;
+  return !inside;
 }
 
 // prepare Hemispherical rounding info

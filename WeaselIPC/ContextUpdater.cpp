@@ -23,6 +23,11 @@ void ContextUpdater::Store(const Deserializer::KeyType& k,
   if (!m_pTarget->p_context || k.size() < 2)
     return;
 
+  if (k[1] == L"clear") {
+    m_pTarget->p_context->clear();
+    return;
+  }
+
   if (k[1] == L"preedit") {
     _StoreText(m_pTarget->p_context->preedit, k, value);
     return;
@@ -70,6 +75,28 @@ void ContextUpdater::_StoreText(Text& target,
 void ContextUpdater::_StoreCand(const Deserializer::KeyType& k,
                                 const std::wstring& value) {
   CandidateInfo& cinfo = m_pTarget->p_context->cinfo;
+  if (k.size() == 3) {
+    if (k[2] == L"clear") {
+      cinfo = CandidateInfo();
+      return;
+    }
+    if (k[2] == L"highlighted") {
+      cinfo.highlighted = _wtoi(value.c_str());
+      return;
+    }
+    if (k[2] == L"currentPage") {
+      cinfo.currentPage = _wtoi(value.c_str());
+      return;
+    }
+    if (k[2] == L"totalPages") {
+      cinfo.totalPages = _wtoi(value.c_str());
+      return;
+    }
+    if (k[2] == L"is_last_page") {
+      cinfo.is_last_page = (value == L"1" || value == L"true");
+      return;
+    }
+  }
   std::wstringstream ss(value);
   weasel::archive::text_wiarchive ia(ss);
 

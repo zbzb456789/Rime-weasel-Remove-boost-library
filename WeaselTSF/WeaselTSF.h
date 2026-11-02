@@ -206,6 +206,7 @@ class WeaselTSF : public ITfTextInputProcessorEx,
 
   com_ptr<ITfContext> _pEditSessionContext;
   std::wstring _editSessionText;
+  std::shared_ptr<weasel::Context> _context;
 
   com_ptr<CCompartmentEventSink> _pKeyboardCompartmentSink;
   com_ptr<CCompartmentEventSink> _pConvertionCompartmentSink;
@@ -233,4 +234,9 @@ class WeaselTSF : public ITfTextInputProcessorEx,
   BOOL _async_edit = false;
   BOOL _committed = false;
   BOOL _isToOpenClose = false;
+  bool _server_connected = false;
+  ULONGLONG _last_server_check = 0;
+  ULONGLONG _last_position_update_tick = 0;
+  bool _position_update_pending = false;
+  unsigned int _retry = 0;
 };

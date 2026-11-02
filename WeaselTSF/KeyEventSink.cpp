@@ -16,11 +16,6 @@ void WeaselTSF::_ProcessKeyEvent(WPARAM wParam, LPARAM lParam, BOOL* pfEaten) {
     return;
   }
 
-  // if server connection is Not OK, don't eat it.
-  if (!_EnsureServerConnected()) {
-    *pfEaten = FALSE;
-    return;
-  }
   weasel::KeyEvent ke;
   GetKeyboardState(_lpbKeyState);
   if (!ConvertKeyEvent(static_cast<UINT>(wParam), lParam, _lpbKeyState, ke)) {
@@ -34,8 +29,24 @@ void WeaselTSF::_ProcessKeyEvent(WPARAM wParam, LPARAM lParam, BOOL* pfEaten) {
       else if (ke.keycode == ibus::Down)
         ke.keycode = ibus::Up;
     }
-    if (!keyCountToSimulate)
-      *pfEaten = (BOOL)m_client.ProcessKeyEvent(ke);
+    if (!keyCountToSimulate) {
+      bool session_invalid = false;
+      bool handled = m_client.ProcessKeyEvent(ke, &session_invalid);
+      if (session_invalid) {
+        // 部署/服务重启会清空服务端会话；这里自动重建会话并重试当前按键。
+        _Reconnect();
+        session_invalid = false;
+        handled = m_client.ProcessKeyEvent(ke, &session_invalid);
+        if (session_invalid) {
+          // 服务进程本身不在时，走原有启动/重连流程再重试一次。
+          if (_EnsureServerConnected()) {
+            session_invalid = false;
+            handled = m_client.ProcessKeyEvent(ke, &session_invalid);
+          }
+        }
+      }
+      *pfEaten = (BOOL)handled;
+    }
 
     if (ke.keycode == ibus::Caps_Lock) {
       if (prevKeyEvent.keycode == ibus::Caps_Lock && prevfEaten == TRUE &&
@@ -67,6 +78,7 @@ STDAPI WeaselTSF::OnSetFocus(BOOL fForeground) {
     m_client.FocusIn();
   else {
     m_client.FocusOut();
+    _server_connected = false;
     _AbortComposition();
   }
 

@@ -2,9 +2,7 @@
 
 #include <WeaselIPCData.h>
 #include <WeaselUI.h>
-#include <gdiplus.h>
 
-#pragma comment(lib, "gdiplus.lib")
 #define IS_FULLSCREENLAYOUT(style)                             \
   (style.layout_type == UIStyle::LAYOUT_VERTICAL_FULLSCREEN || \
    style.layout_type == UIStyle::LAYOUT_HORIZONTAL_FULLSCREEN)
@@ -13,41 +11,6 @@
    style.layout_type != UIStyle::LAYOUT_HORIZONTAL_FULLSCREEN)
 
 namespace weasel {
-class GraphicsRoundRectPath : public Gdiplus::GraphicsPath {
- public:
-  GraphicsRoundRectPath() {};
-  GraphicsRoundRectPath(int left,
-                        int top,
-                        int width,
-                        int height,
-                        int cornerx,
-                        int cornery)
-      : Gdiplus::GraphicsPath() {
-    AddRoundRect(left, top, width, height, cornerx, cornery);
-  }
-  GraphicsRoundRectPath(const CRect rc, int corner) {
-    if (corner > 0)
-      AddRoundRect(rc.left, rc.top, rc.Width(), rc.Height(), corner, corner);
-    else
-      AddRectangle(Gdiplus::Rect(rc.left, rc.top, rc.Width(), rc.Height()));
-  }
-
-  GraphicsRoundRectPath(const CRect rc,
-                        int corner,
-                        bool roundTopLeft,
-                        bool roundTopRight,
-                        bool roundBottomRight,
-                        bool roundBottomLeft);
-
- public:
-  void AddRoundRect(int left,
-                    int top,
-                    int width,
-                    int height,
-                    int cornerx,
-                    int cornery);
-};
-
 struct IsToRoundStruct {
   bool IsTopLeftNeedToRound;
   bool IsBottomLeftNeedToRound;
@@ -100,7 +63,13 @@ class Layout {
                                size_t nCount,
                                ComPtr<IDWriteTextFormat1>& pTextFormat,
                                PDWR pDWR,
-                             LPSIZE lpSize) const = 0;
+                             LPSIZE lpSize,
+                             bool force_horizontal = false) const = 0;
+  // preedit / auxiliary text drawn as a vertical column instead of a
+  // horizontal run
+  virtual bool IsVerticalPreedit() const {
+    return _style.layout_type == UIStyle::LAYOUT_VERTICAL_TEXT;
+  }
 
   int offsetX = 0;
   int offsetY = 0;

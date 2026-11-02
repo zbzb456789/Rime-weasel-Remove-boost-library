@@ -13,6 +13,8 @@ void VHorizontalLayout::DoLayout(CDCHandle dc, PDWR pDWR) {
   CSize size;
   int height = offsetY, width = offsetX + real_margin_x;
   int h = offsetY + real_margin_y;
+  _preeditRect.SetRectEmpty();
+  _auxiliaryRect.SetRectEmpty();
 
   if ((_style.hilited_mark_color & 0xff000000)) {
     CSize sg;
@@ -37,56 +39,69 @@ void VHorizontalLayout::DoLayout(CDCHandle dc, PDWR pDWR) {
                                           : mark_height + _style.hilite_spacing;
   }
   int base_offset = ((_style.hilited_mark_color & 0xff000000)) ? mark_gap : 0;
+  // the status icon is drawn at the top of the first candidate column, keep
+  // that slot free
+  if (candidates_count && ShouldDisplayStatusIcon())
+    base_offset = max(base_offset, STATUS_ICON_SIZE);
 
-  // calc page indicator
-  CSize pgszl, pgszr;
-  if (!IsInlinePreedit()) {
-    GetTextSizeDW(pre, pre.length(), pDWR->pPreeditTextFormat, pDWR, &pgszl);
-    GetTextSizeDW(next, next.length(), pDWR->pPreeditTextFormat, pDWR, &pgszr);
-  }
+  // calc page indicator (always laid out horizontally inside the top band)
+  CSize pgszl{0, 0}, pgszr{0, 0};
   bool page_en = (_style.prevpage_color & 0xff000000) &&
                  (_style.nextpage_color & 0xff000000);
-  int pgh = page_en ? pgszl.cy + pgszr.cy + _style.hilite_spacing +
-                          _style.hilite_padding_y * 2
-                    : 0;
-  int pgw = page_en ? max(pgszl.cx, pgszr.cx) : 0;
+  if (!IsInlinePreedit() && page_en) {
+    GetTextSizeDW(pre, pre.length(), pDWR->pPreeditTextFormat, pDWR, &pgszl,
+                  true);
+    GetTextSizeDW(next, next.length(), pDWR->pPreeditTextFormat, pDWR, &pgszr,
+                  true);
+  }
+  int pgh = page_en ? max(pgszl.cy, pgszr.cy) : 0;
+  int pgw = page_en ? pgszl.cx + pgszr.cx + _style.hilite_spacing : 0;
+  // The encoding (preedit) and the auxiliary text are drawn as one horizontal
+  // band across the top of the window; the candidates below stay in vertical
+  // columns.
+  const int band_left = offsetX + real_margin_x;
+  int band_right = band_left;
+  int band_bottom = h;
+  const int band_top = h;
 
   /* Preedit */
   if (!IsInlinePreedit() && !_context.preedit.str.empty()) {
-    size = GetPreeditSize(dc, _context.preedit, pDWR->pPreeditTextFormat, pDWR);
-    int szx = max(size.cx, pgw), szy = pgh;
-    // icon size wider then preedit text
-    int xoffset = (STATUS_ICON_SIZE >= szx && ShouldDisplayStatusIcon())
-                      ? (STATUS_ICON_SIZE - szx) / 2
-                      : 0;
-    _preeditRect.SetRect(width + xoffset, h, width + xoffset + size.cx,
-                         h + size.cy);
-    width += size.cx + xoffset * 2 + _style.spacing;
-    height = max(height, offsetY + real_margin_y + size.cy + szy);
-    if (ShouldDisplayStatusIcon())
-      height += STATUS_ICON_SIZE;
+    size = GetPreeditSize(dc, _context.preedit, pDWR->pPreeditTextFormat, pDWR,
+                          true);
+    _preeditRect.SetRect(band_right, h, band_right + size.cx, h + size.cy);
+    band_right += size.cx + _style.spacing;
+    band_bottom = max(band_bottom, h + size.cy);
   }
 
   /* Auxiliary */
   if (!_context.aux.str.empty()) {
-    size = GetPreeditSize(dc, _context.aux, pDWR->pPreeditTextFormat, pDWR);
-    // icon size wider then preedit text
-    int xoffset = (STATUS_ICON_SIZE >= size.cx && ShouldDisplayStatusIcon())
-                      ? (STATUS_ICON_SIZE - size.cx) / 2
-                      : 0;
-    _auxiliaryRect.SetRect(width + xoffset, h, width + xoffset + size.cx,
-                           h + size.cy);
-    width += size.cx + xoffset * 2 + _style.spacing;
-    height = max(height, offsetY + real_margin_y + size.cy);
+    size =
+        GetPreeditSize(dc, _context.aux, pDWR->pPreeditTextFormat, pDWR, true);
+    _auxiliaryRect.SetRect(band_right, h, band_right + size.cx, h + size.cy);
+    band_right += size.cx + _style.spacing;
+    band_bottom = max(band_bottom, h + size.cy);
   }
+  if (band_right > band_left)
+    band_right -= _style.spacing;
+  if (pgh)
+    band_bottom = max(band_bottom, h + pgh);
+  // band height plus the gap kept between the band and the candidate columns
+  const int band_height =
+      (band_bottom > h) ? band_bottom - h + _style.spacing : 0;
+  const int cand_top = h + band_height;
+  int band_min_width = band_right - band_left;
+  if (pgw)
+    band_min_width =
+        band_min_width ? band_min_width + _style.spacing + pgw : pgw;
+  height = max(height, band_bottom);
   /* Candidates */
   int wids[MAX_CANDIDATES_COUNT] = {0};
-  int w = width;
+  int w = band_left;
   int max_comment_heihgt = 0, max_content_height = 0;
   if (candidates_count) {
     for (auto i = 0; i < candidates_count && i < MAX_CANDIDATES_COUNT; ++i) {
       int wid = 0;
-      h = offsetY + real_margin_y + base_offset;
+      h = cand_top + base_offset;
       /* Label */
       std::wstring label =
           GetLabelText(labels, i, _style.label_text_format.c_str());
@@ -134,6 +149,7 @@ void VHorizontalLayout::DoLayout(CDCHandle dc, PDWR pDWR) {
   }
 
   width = max(width, w);
+  width = max(width, band_left + band_min_width);
   width += real_margin_x;
 
   // reposition candidates
@@ -173,21 +189,17 @@ void VHorizontalLayout::DoLayout(CDCHandle dc, PDWR pDWR) {
       _candidateRects[i].bottom =
           _candidateCommentRects[i].top + max_comment_heihgt;
     }
-    height = max(height, offsetY + _candidateRects[0].Height() + real_margin_y);
-    if ((_candidateRects[0].top - real_margin_y + height) >
-        _candidateRects[0].bottom)
+    height = max(height, cand_top + _candidateRects[0].Height() + real_margin_y);
+    // let the highlighted candidate rectangle cover the whole column, so the
+    // highlight spans from the top of the candidate area down to the bottom of
+    // the window
+    if (height > _candidateRects[0].bottom)
       for (auto i = 0; i < candidates_count && i < MAX_CANDIDATES_COUNT; ++i)
-        _candidateRects[i].bottom =
-            (_candidateRects[0].top - offsetY - real_margin_y + height);
+        _candidateRects[i].bottom = height;
     if (!_style.vertical_text_left_to_right) {
-      // re position right to left
-      int base_left;
-      if ((!IsInlinePreedit() && !_context.preedit.str.empty()))
-        base_left = _preeditRect.left;
-      else if (!_context.aux.str.empty())
-        base_left = _auxiliaryRect.left;
-      else
-        base_left = _candidateRects[0].left;
+      // re position right to left, the columns start from the content's left
+      // edge because the preedit text lives in the top band
+      const int base_left = band_left;
       for (int i = candidates_count - 1; i >= 0; i--) {
         int offset;
         if (i == candidates_count - 1)
@@ -200,15 +212,8 @@ void VHorizontalLayout::DoLayout(CDCHandle dc, PDWR pDWR) {
         _candidateTextRects[i].OffsetRect(offset, 0);
         _candidateCommentRects[i].OffsetRect(offset, 0);
       }
-      if (!IsInlinePreedit() && !_context.preedit.str.empty())
-        _preeditRect.OffsetRect(
-            _candidateRects[0].right + _style.spacing - _preeditRect.left, 0);
-      if (!_context.aux.str.empty())
-        _auxiliaryRect.OffsetRect(
-            _candidateRects[0].right + _style.spacing - _auxiliaryRect.left, 0);
     }
-  } else
-    width -= _style.spacing;
+  }
 
   height += real_margin_y;
 
@@ -217,6 +222,18 @@ void VHorizontalLayout::DoLayout(CDCHandle dc, PDWR pDWR) {
     height = max(height, _style.min_height);
   }
   UpdateStatusIconLayout(&width, &height);
+  // The status icon is drawn at the top of the first candidate column, inside
+  // the column highlight, instead of next to the preedit text.
+  if (ShouldDisplayStatusIcon() && candidates_count) {
+    const int icon_size =
+        min(STATUS_ICON_SIZE, (int)_candidateRects[0].Width());
+    const int icon_cx = (_candidateRects[0].left + _candidateRects[0].right) / 2;
+    const int icon_top =
+        cand_top + max(0, (STATUS_ICON_SIZE - icon_size) / 2);
+    _statusIconRect.SetRect(icon_cx - icon_size / 2, icon_top,
+                            icon_cx - icon_size / 2 + icon_size,
+                            icon_top + icon_size);
+  }
   // candidate rectangle always align to bottom side, margin_y to the bottom
   // edge
   for (auto i = 0; i < candidates_count && i < MAX_CANDIDATES_COUNT; ++i) {
@@ -231,17 +248,13 @@ void VHorizontalLayout::DoLayout(CDCHandle dc, PDWR pDWR) {
 
   // calc page indicator
   if (page_en && candidates_count && !_style.inline_preedit) {
-    int _prey = _contentSize.cy - offsetY - real_margin_y +
-                _style.hilite_padding_y - pgh;
-    int _prex = (_preeditRect.left + _preeditRect.right) / 2 - pgszl.cx / 2;
+    // the page indicator sits at the right end of the top band
+    int _prey = band_top + (band_bottom - band_top - pgh) / 2;
+    int _prex = _contentSize.cx - real_margin_x - pgw;
     _prePageRect.SetRect(_prex, _prey, _prex + pgszl.cx, _prey + pgszl.cy);
-    _nextPageRect.SetRect(
-        _prex, _prePageRect.bottom + _style.hilite_spacing, _prex + pgszr.cx,
-        _prePageRect.bottom + _style.hilite_spacing + pgszr.cy);
-    if (ShouldDisplayStatusIcon()) {
-      _prePageRect.OffsetRect(0, -STATUS_ICON_SIZE);
-      _nextPageRect.OffsetRect(0, -STATUS_ICON_SIZE);
-    }
+    _nextPageRect.SetRect(_prePageRect.right + _style.hilite_spacing, _prey,
+                          _prePageRect.right + _style.hilite_spacing + pgszr.cx,
+                          _prey + pgszr.cy);
   }
 
   _contentRect.SetRect(0, 0, _contentSize.cx, _contentSize.cy);
@@ -259,6 +272,8 @@ void VHorizontalLayout::DoLayoutWithWrap(CDCHandle dc, PDWR pDWR) {
   CSize size;
   int height = offsetY, width = offsetX + real_margin_x;
   int h = offsetY + real_margin_y;
+  _preeditRect.SetRectEmpty();
+  _auxiliaryRect.SetRectEmpty();
 
   if ((_style.hilited_mark_color & 0xff000000)) {
     CSize sg;
@@ -283,48 +298,60 @@ void VHorizontalLayout::DoLayoutWithWrap(CDCHandle dc, PDWR pDWR) {
                                           : mark_height + _style.hilite_spacing;
   }
   int base_offset = ((_style.hilited_mark_color & 0xff000000)) ? mark_gap : 0;
+  // the status icon is drawn at the top of the first candidate column, keep
+  // that slot free
+  if (candidates_count && ShouldDisplayStatusIcon())
+    base_offset = max(base_offset, STATUS_ICON_SIZE);
 
-  // calc page indicator
-  CSize pgszl, pgszr;
-  if (!IsInlinePreedit()) {
-    GetTextSizeDW(pre, pre.length(), pDWR->pPreeditTextFormat, pDWR, &pgszl);
-    GetTextSizeDW(next, next.length(), pDWR->pPreeditTextFormat, pDWR, &pgszr);
-  }
+  // calc page indicator (always laid out horizontally inside the top band)
+  CSize pgszl{0, 0}, pgszr{0, 0};
   bool page_en = (_style.prevpage_color & 0xff000000) &&
                  (_style.nextpage_color & 0xff000000);
-  int pgh = page_en ? pgszl.cy + pgszr.cy + _style.hilite_spacing +
-                          _style.hilite_padding_y * 2
-                    : 0;
-  int pgw = page_en ? max(pgszl.cx, pgszr.cx) : 0;
+  if (!IsInlinePreedit() && page_en) {
+    GetTextSizeDW(pre, pre.length(), pDWR->pPreeditTextFormat, pDWR, &pgszl,
+                  true);
+    GetTextSizeDW(next, next.length(), pDWR->pPreeditTextFormat, pDWR, &pgszr,
+                  true);
+  }
+  int pgh = page_en ? max(pgszl.cy, pgszr.cy) : 0;
+  int pgw = page_en ? pgszl.cx + pgszr.cx + _style.hilite_spacing : 0;
+  // The encoding (preedit) and the auxiliary text are drawn as one horizontal
+  // band across the top of the window; the candidates below stay in vertical
+  // columns.
+  const int band_left = offsetX + real_margin_x;
+  int band_right = band_left;
+  int band_bottom = h;
+  const int band_top = h;
 
   /* Preedit */
   if (!IsInlinePreedit() && !_context.preedit.str.empty()) {
-    size = GetPreeditSize(dc, _context.preedit, pDWR->pPreeditTextFormat, pDWR);
-    size_t szx = max(size.cx, pgw), szy = pgh;
-    // icon size wider then preedit text
-    int xoffset = ((size_t)STATUS_ICON_SIZE >= szx && ShouldDisplayStatusIcon())
-                      ? (int)(STATUS_ICON_SIZE - szx) / 2
-                      : 0;
-    _preeditRect.SetRect(width + xoffset, h, width + xoffset + size.cx,
-                         h + size.cy);
-    width += size.cx + xoffset * 2 + _style.spacing;
-    height = static_cast<int>(
-        max((size_t)height, offsetY + real_margin_y + size.cy + szy));
-    if (ShouldDisplayStatusIcon())
-      height += STATUS_ICON_SIZE;
+    size = GetPreeditSize(dc, _context.preedit, pDWR->pPreeditTextFormat, pDWR,
+                          true);
+    _preeditRect.SetRect(band_right, h, band_right + size.cx, h + size.cy);
+    band_right += size.cx + _style.spacing;
+    band_bottom = max(band_bottom, h + size.cy);
   }
   /* Auxiliary */
   if (!_context.aux.str.empty()) {
-    size = GetPreeditSize(dc, _context.aux, pDWR->pPreeditTextFormat, pDWR);
-    // icon size wider then auxiliary text
-    int xoffset = (STATUS_ICON_SIZE >= size.cx && ShouldDisplayStatusIcon())
-                      ? (STATUS_ICON_SIZE - size.cx) / 2
-                      : 0;
-    _auxiliaryRect.SetRect(width + xoffset, h, width + xoffset + size.cx,
-                           h + size.cy);
-    width += size.cx + xoffset * 2 + _style.spacing;
-    height = max(height, offsetY + real_margin_y + size.cy);
+    size =
+        GetPreeditSize(dc, _context.aux, pDWR->pPreeditTextFormat, pDWR, true);
+    _auxiliaryRect.SetRect(band_right, h, band_right + size.cx, h + size.cy);
+    band_right += size.cx + _style.spacing;
+    band_bottom = max(band_bottom, h + size.cy);
   }
+  if (band_right > band_left)
+    band_right -= _style.spacing;
+  if (pgh)
+    band_bottom = max(band_bottom, h + pgh);
+  // band height plus the gap kept between the band and the candidate columns
+  const int band_height =
+      (band_bottom > h) ? band_bottom - h + _style.spacing : 0;
+  const int cand_top = h + band_height;
+  int band_min_width = band_right - band_left;
+  if (pgw)
+    band_min_width =
+        band_min_width ? band_min_width + _style.spacing + pgw : pgw;
+  height = max(height, band_bottom);
   // candidates
   int col_cnt = 0;
   int max_height_of_cols = 0;
@@ -332,7 +359,7 @@ void VHorizontalLayout::DoLayoutWithWrap(CDCHandle dc, PDWR pDWR) {
   int col_of_candidate[MAX_CANDIDATES_COUNT] = {0};
   int minleft_of_cols[MAX_CANDIDATES_COUNT] = {0};
   if (candidates_count) {
-    h = offsetY + real_margin_y;
+    h = cand_top;
     for (auto i = 0; i < candidates_count && i < MAX_CANDIDATES_COUNT; i++) {
       int current_cand_height = 0;
       if (i > 0)
@@ -374,12 +401,12 @@ void VHorizontalLayout::DoLayoutWithWrap(CDCHandle dc, PDWR pDWR) {
         _candidateCommentRects[i].SetRect(width, h, width + size.cx, h);
       int base_top = (i == id) ? _candidateLabelRects[i].top - base_offset
                                : _candidateLabelRects[i].top;
-      if (_style.max_height > 0 && (base_top > real_margin_y + offsetY) &&
+      if (_style.max_height > 0 && (base_top > cand_top) &&
           (_candidateCommentRects[i].bottom - offsetY + real_margin_y >
            _style.max_height)) {
         max_height_of_cols =
             max(max_height_of_cols, _candidateCommentRects[i - 1].bottom);
-        h = offsetY + real_margin_y + (i == id ? base_offset : 0);
+        h = cand_top + (i == id ? base_offset : 0);
         int ofy = h - _candidateLabelRects[i].top;
         int ofx = width_of_cols[col_cnt] + _style.candidate_spacing;
         _candidateLabelRects[i].OffsetRect(ofx, ofy);
@@ -455,14 +482,9 @@ void VHorizontalLayout::DoLayoutWithWrap(CDCHandle dc, PDWR pDWR) {
   int first_cand_of_cols[MAX_CANDIDATES_COUNT] = {0};
   int offset_of_cols[MAX_CANDIDATES_COUNT] = {0};
   if (!_style.vertical_text_left_to_right) {
-    // re position right to left
-    int base_left;
-    if ((!IsInlinePreedit() && !_context.preedit.str.empty()))
-      base_left = _preeditRect.left;
-    else if (!_context.aux.str.empty())
-      base_left = _auxiliaryRect.left;
-    else if (candidates_count)
-      base_left = _candidateRects[0].left;
+    // re position right to left; the encoding bar lives in the top band, only
+    // the order of the candidate columns is reversed
+    const int base_left = band_left;
     if (candidates_count) {
       // calc offset for each col
       for (auto col_t = 0; col_t <= col_cnt; col_t++) {
@@ -495,15 +517,10 @@ void VHorizontalLayout::DoLayoutWithWrap(CDCHandle dc, PDWR pDWR) {
             offset_of_cols[col_of_candidate[i]], 0);
       }
       _highlightRect = _candidateRects[id];
-      if (!IsInlinePreedit() && !_context.preedit.str.empty())
-        _preeditRect.OffsetRect(
-            _candidateRects[0].right + _style.spacing - _preeditRect.left, 0);
-      if (!_context.aux.str.empty())
-        _auxiliaryRect.OffsetRect(
-            _candidateRects[0].right + _style.spacing - _auxiliaryRect.left, 0);
     }
   }
 
+  width = max(width, band_left + band_min_width - offsetX);
   width += real_margin_x;
   height += real_margin_y;
   if (candidates_count) {
@@ -512,22 +529,31 @@ void VHorizontalLayout::DoLayoutWithWrap(CDCHandle dc, PDWR pDWR) {
   }
   _highlightRect = _candidateRects[id];
   UpdateStatusIconLayout(&width, &height);
+  // The status icon is drawn at the top of the first candidate column, inside
+  // the column highlight, instead of next to the preedit text.
+  if (ShouldDisplayStatusIcon() && candidates_count) {
+    const int icon_size =
+        min(STATUS_ICON_SIZE, (int)_candidateRects[0].Width());
+    const int icon_cx =
+        (_candidateRects[0].left + _candidateRects[0].right) / 2;
+    const int icon_top =
+        cand_top + max(0, (STATUS_ICON_SIZE - icon_size) / 2);
+    _statusIconRect.SetRect(icon_cx - icon_size / 2, icon_top,
+                            icon_cx - icon_size / 2 + icon_size,
+                            icon_top + icon_size);
+  }
   _contentSize.SetSize(width + 2 * offsetX, height + offsetY);
   _contentRect.SetRect(0, 0, _contentSize.cx, _contentSize.cy);
 
   // calc page indicator
   if (page_en && candidates_count && !_style.inline_preedit) {
-    int _prey = _contentSize.cy - offsetY - real_margin_y +
-                _style.hilite_padding_y - pgh;
-    int _prex = (_preeditRect.left + _preeditRect.right) / 2 - pgszl.cx / 2;
+    // the page indicator sits at the right end of the top band
+    int _prey = band_top + (band_bottom - band_top - pgh) / 2;
+    int _prex = _contentSize.cx - offsetX - real_margin_x - pgw;
     _prePageRect.SetRect(_prex, _prey, _prex + pgszl.cx, _prey + pgszl.cy);
-    _nextPageRect.SetRect(
-        _prex, _prePageRect.bottom + _style.hilite_spacing, _prex + pgszr.cx,
-        _prePageRect.bottom + _style.hilite_spacing + pgszr.cy);
-    if (ShouldDisplayStatusIcon()) {
-      _prePageRect.OffsetRect(0, -STATUS_ICON_SIZE);
-      _nextPageRect.OffsetRect(0, -STATUS_ICON_SIZE);
-    }
+    _nextPageRect.SetRect(_prePageRect.right + _style.hilite_spacing, _prey,
+                          _prePageRect.right + _style.hilite_spacing + pgszr.cx,
+                          _prey + pgszr.cy);
   }
 
   // prepare temp rect _bgRect for roundinfo calculation

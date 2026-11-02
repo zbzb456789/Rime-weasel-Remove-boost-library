@@ -37,7 +37,7 @@ std::filesystem::path WeaselUserDataPath();
 inline fs::path WeaselLogPath() {
   WCHAR _path[MAX_PATH] = {0};
   // default location
-  ExpandEnvironmentStringsW(L"%TEMP%\\rime.weasel", _path, _countof(_path));
+  ExpandEnvironmentStringsW(L"%TEMP%\\rime.ui", _path, _countof(_path));
   fs::path path = fs::path(_path);
   if (!fs::exists(path)) {
     fs::create_directories(path);
@@ -51,7 +51,7 @@ inline BOOL IsUserDarkMode() {
   constexpr const LPCWSTR value = L"AppsUseLightTheme";
 
   DWORD type;
-  DWORD data;
+  DWORD data = 0;
   DWORD size = sizeof(DWORD);
   LSTATUS st = RegGetValue(HKEY_CURRENT_USER, key, value, RRF_RT_REG_DWORD,
                            &type, &data, &size);
@@ -187,24 +187,14 @@ inline std::basic_string<CharT> unescape_string(
 std::string GetCustomResource(const char* name, const char* type);
 
 inline std::wstring get_weasel_ime_name() {
-  LANGID langId = GetUserDefaultUILanguage();
-
-  if (langId == MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_TRADITIONAL) ||
-      langId == MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED) ||
-      langId == MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_HONGKONG) ||
-      langId == MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_SINGAPORE) ||
-      langId == MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_MACAU)) {
-    return L"小狼毫";
-  } else {
-    return L"Weasel";
-  }
+  return L"RimeUI";
 }
 
 inline LONG RegGetStringValue(HKEY key,
                               LPCWSTR lpSubKey,
                               LPCWSTR lpValue,
                               std::wstring& value) {
-  TCHAR szValue[MAX_PATH];
+  TCHAR szValue[MAX_PATH]{};
   DWORD dwBufLen = MAX_PATH;
 
   LONG lRes = RegGetValue(key, lpSubKey, lpValue, RRF_RT_REG_SZ, NULL, szValue,
@@ -217,7 +207,7 @@ inline LONG RegGetStringValue(HKEY key,
 
 inline LANGID get_language_id() {
   std::wstring lang{};
-  if (RegGetStringValue(HKEY_CURRENT_USER, L"Software\\Rime\\Weasel",
+  if (RegGetStringValue(HKEY_CURRENT_USER, L"Software\\RimeUI",
                         L"Language", lang) == ERROR_SUCCESS) {
     if (lang == L"chs")
       return MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED);

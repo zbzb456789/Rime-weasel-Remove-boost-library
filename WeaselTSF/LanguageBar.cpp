@@ -37,9 +37,9 @@ static void HMENU2ITfMenu(HMENU hMenu, ITfMenu* pTfMenu) {
 static LPCWSTR GetWeaselRegName() {
   LPCWSTR WEASEL_REG_NAME_;
   if (is_wow64())
-    WEASEL_REG_NAME_ = L"Software\\WOW6432Node\\Rime\\Weasel";
+    WEASEL_REG_NAME_ = L"Software\\WOW6432Node\\RimeUI";
   else
-    WEASEL_REG_NAME_ = L"Software\\Rime\\Weasel";
+    WEASEL_REG_NAME_ = L"Software\\RimeUI";
 
   return WEASEL_REG_NAME_;
 }
@@ -111,7 +111,7 @@ STDAPI CLangBarItemButton::GetInfo(TF_LANGBARITEMINFO* pInfo) {
   pInfo->dwStyle = TF_LBI_STYLE_BTN_BUTTON | TF_LBI_STYLE_BTN_MENU |
                    TF_LBI_STYLE_SHOWNINTRAY;
   pInfo->ulSort = 1;
-  lstrcpyW(pInfo->szDescription, L"WeaselTSF Button");
+  lstrcpyW(pInfo->szDescription, L"RimeUI Button");
   return S_OK;
 }
 
@@ -227,7 +227,7 @@ STDAPI CLangBarItemButton::GetIcon(HICON* phIcon) {
 }
 
 STDAPI CLangBarItemButton::GetText(BSTR* pbstrText) {
-  *pbstrText = SysAllocString(L"WeaselTSF Button");
+  *pbstrText = SysAllocString(L"RimeUI Button");
   return (*pbstrText == NULL) ? E_OUTOFMEMORY : S_OK;
 }
 
@@ -294,7 +294,7 @@ void CLangBarItemButton::SetLangbarStatus(DWORD dwStatus, BOOL fSet) {
 
 std::wstring WeaselTSF::_GetRootDir() {
   std::wstring dir{};
-  RegGetStringValue(HKEY_LOCAL_MACHINE, GetWeaselRegName(), L"WeaselRoot", dir);
+  RegGetStringValue(HKEY_LOCAL_MACHINE, GetWeaselRegName(), L"RimeUIRoot", dir);
   return dir;
 }
 
@@ -304,7 +304,7 @@ void WeaselTSF::_HandleLangBarMenuSelect(UINT wID) {
     case ID_WEASELTRAY_RERUN_SERVICE:
     case ID_WEASELTRAY_INSTALLDIR:
       if (RegGetStringValue(HKEY_LOCAL_MACHINE, GetWeaselRegName(),
-                            L"WeaselRoot", dir) == ERROR_SUCCESS) {
+                            L"RimeUIRoot", dir) == ERROR_SUCCESS) {
         if (wID == ID_WEASELTRAY_RERUN_SERVICE) {
           std::thread th([dir]() {
             ShellExecuteW(NULL, L"open", (dir + L"\\start_service.bat").c_str(),
@@ -316,11 +316,11 @@ void WeaselTSF::_HandleLangBarMenuSelect(UINT wID) {
       }
       break;
     case ID_WEASELTRAY_USERCONFIG:
-      if (FAILED(RegGetStringValue(HKEY_CURRENT_USER, L"Software\\Rime\\Weasel",
+      if (FAILED(RegGetStringValue(HKEY_CURRENT_USER, L"Software\\RimeUI",
                                    L"RimeUserDir", dir)) ||
           dir.empty()) {
         WCHAR _path[MAX_PATH] = {0};
-        ExpandEnvironmentStringsW(L"%AppData%\\Rime", _path, _countof(_path));
+        ExpandEnvironmentStringsW(L"%AppData%\\RimeUI", _path, _countof(_path));
         dir = std::wstring(_path);
       }
       if (!dir.empty() && fs::exists(dir))
@@ -339,9 +339,9 @@ void WeaselTSF::_HandleLangBarMenuSelect(UINT wID) {
       std::wstring installDir{};
       // 从注册表 HKLM 获取安装根目录
       if (RegGetStringValue(HKEY_LOCAL_MACHINE, GetWeaselRegName(),
-                            L"WeaselRoot", installDir) == ERROR_SUCCESS) {
+                            L"RimeUIRoot", installDir) == ERROR_SUCCESS) {
         // 拼接路径：安装目录\data\YourWinFormApp.exe
-        std::wstring exePath = installDir + L"\\WeaselSettings.exe";
+        std::wstring exePath = installDir + L"\\RimeUISettings.exe";
 
         // 启动 WinForm，并把安装目录作为工作目录
         ShellExecuteW(NULL, L"open", exePath.c_str(), NULL, installDir.c_str(),
